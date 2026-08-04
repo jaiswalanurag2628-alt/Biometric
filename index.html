@@ -3,43 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance Format Converter</title>
+    <title>Biometric Report Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS for Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- jsPDF and autoTable for PDF generation in browser -->
+    <!-- pdf.js for reading PDF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- jsPDF for generating professional PDF reports -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body class="bg-gray-50 p-6">
-    <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md">
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">Teacher Attendance Converter</h1>
-        <p class="text-gray-600 mb-6">Upload your attendance file to instantly format, calculate working hours, and download as CSV or PDF.</p>
+<body class="bg-slate-50 p-8">
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
+        <h1 class="text-2xl font-bold text-slate-800 mb-2">Biometric Attendance Generator</h1>
+        <p class="text-slate-600 mb-6">Upload your raw attendance file (Excel or PDF). The utility extracts records, calculates working hours, evaluates partial absences, and generates a clear, high-resolution professional report.</p>
         
         <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Select Attendance File (.xlsx / .xls)</label>
-            <input type="file" id="fileInput" accept=".xlsx, .xls" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+            <label class="block text-sm font-semibold text-slate-700 mb-2">Select Attendance File (.xlsx, .xls, .pdf)</label>
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-750 hover:file:bg-blue-100 cursor-pointer border border-slate-200 rounded-lg p-2">
         </div>
 
         <div class="flex gap-4">
-            <button onclick="processAndDownload('csv')" class="w-1/2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200">
-                Download CSV
+            <button onclick="processAndDownload('csv')" class="w-1/2 bg-slate-700 text-white font-semibold py-3 px-4 rounded-xl hover:bg-slate-800 transition duration-200 shadow-sm">
+                Download Excel
             </button>
-            <button onclick="processAndDownload('pdf')" class="w-1/2 bg-emerald-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-emerald-700 transition duration-200">
+            <button onclick="processAndDownload('pdf')" class="w-1/2 bg-blue-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-blue-700 transition duration-200 shadow-sm">
                 Download PDF
             </button>
         </div>
     </div>
 
     <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
         function calculateWorkingHours(inStr, outStr) {
-            if (!inStr || !outStr || inStr === '--' || outStr === '--') return '00:00';
+            if (!inStr || !outStr || inStr === '--' || outStr === '--' || inStr.trim() === '' || outStr.trim() === '') return '00:00';
             try {
                 const parseTime = (tStr) => {
-                    const parts = tStr.trim().split(' ');
+                    const cleanStr = tStr.trim().toUpperCase();
+                    const parts = cleanStr.split(' ');
                     const timeParts = parts[0].split(':');
                     let hours = parseInt(timeParts[0], 10);
                     let minutes = parseInt(timeParts[1], 10);
-                    const modifier = parts[1] ? parts[1].toUpperCase() : '';
+                    const modifier = parts[1] || '';
                     if (modifier === 'PM' && hours < 12) hours += 12;
                     if (modifier === 'AM' && hours === 12) hours = 0;
                     return hours * 60 + minutes;
@@ -58,144 +64,237 @@
             }
         }
 
-        function processAndDownload(format) {
+        function evaluateStatus(inTime, outTime) {
+            let hasIn = inTime && inTime !== '--' && inTime.trim() !== '';
+            let hasOut = outTime && outTime !== '--' && outTime.trim() !== '';
+
+            if (hasIn && hasOut) return 'Present';
+            if (!hasIn && !hasOut) return 'Full Day Absent';
+            if (!hasIn) return 'First Half Absent';
+            return 'Second Half Absent';
+        }
+
+        async function processAndDownload(outputFormat) {
             const fileInput = document.getElementById('fileInput');
             if (fileInput.files.length === 0) {
-                alert('Please select a file first!');
+                alert('Please select an attendance file first!');
                 return;
             }
 
             const file = fileInput.files[0];
-            const reader = new FileReader();
+            const fileName = file.name.toLowerCase();
+            // Timetable column removed from headers array
+            let formattedData = [["Date", "Teacher / Employee Name", "Shift", "In Time", "Out Time", "Working Hours", "Status"]];
 
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                
-                let formattedData = [["Date", "Teacher Name", "Class / Timetable", "In Time", "Out Time", "Working Hours"]];
+            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    let isMatrixFormat = rows.some(row => row && row.some(cell => cell && cell.toString().trim().toLowerCase() === 'present/absent'));
 
-                let isMatrixFormat = rows.some(row => row && row.some(cell => cell && cell.toString().trim().toLowerCase() === 'present/absent'));
-
-                if (isMatrixFormat) {
-                    let nameRowIdx = -1;
-                    for (let i = 0; i < rows.length; i++) {
-                        if (rows[i] && rows[i].some(cell => cell && cell.toString().trim().toLowerCase() === 'name')) {
-                            nameRowIdx = i;
-                            break;
-                        }
-                    }
-                    if (nameRowIdx === -1) nameRowIdx = 4;
-                    let teacherNames = rows[nameRowIdx];
-
-                    for (let i = nameRowIdx + 2; i < rows.length; i++) {
-                        let r = rows[i];
-                        if (!r || r.length === 0) continue;
-                        let day = r[0];
-                        if (!day || isNaN(day)) continue;
-
-                        let dateStr = `2026-07-${String(day).padStart(2, '0')}`;
-
-                        for (let col = 2; col < teacherNames.length; col++) {
-                            let teacherName = teacherNames[col];
-                            if (!teacherName) continue;
-                            teacherName = teacherName.trim();
-
-                            let cellVal = r[col] || '-';
-                            let inTime = '--';
-                            let outTime = '--';
-                            let workingHours = '00:00';
-
-                            if (cellVal !== '-' && cellVal.includes('-')) {
-                                let parts = cellVal.split('-');
-                                inTime = parts[0].trim();
-                                outTime = parts[1].trim();
-                                workingHours = calculateWorkingHours(inTime, outTime);
+                    if (isMatrixFormat) {
+                        let nameRowIdx = 4;
+                        for (let i = 0; i < rows.length; i++) {
+                            if (rows[i] && rows[i].some(cell => cell && cell.toString().trim().toLowerCase() === 'name')) {
+                                nameRowIdx = i;
+                                break;
                             }
-
-                            formattedData.push([dateStr, teacherName, 'Teaching Staff', inTime, outTime, workingHours]);
                         }
-                    }
-                } else {
-                    let headerRowIdx = -1;
-                    for (let i = 0; i < rows.length; i++) {
-                        if (rows[i] && rows[i].includes('Department')) {
-                            headerRowIdx = i;
-                            break;
+                        let teacherNames = rows[nameRowIdx];
+
+                        for (let i = nameRowIdx + 2; i < rows.length; i++) {
+                            let r = rows[i];
+                            if (!r || r.length === 0) continue;
+                            let day = r[0];
+                            if (!day || isNaN(day)) continue;
+
+                            let dateStr = `2026-08-${String(day).padStart(2, '0')}`;
+
+                            for (let col = 2; col < teacherNames.length; col++) {
+                                let teacherName = teacherNames[col];
+                                if (!teacherName) continue;
+                                teacherName = teacherName.trim();
+
+                                let cellVal = r[col] || '-';
+                                let inTime = '--';
+                                let outTime = '--';
+                                let workingHours = '00:00';
+
+                                if (cellVal !== '-' && cellVal.includes('-')) {
+                                    let parts = cellVal.split('-');
+                                    inTime = parts[0].trim();
+                                    outTime = parts[1].trim();
+                                    workingHours = calculateWorkingHours(inTime, outTime);
+                                }
+
+                                let status = evaluateStatus(inTime, outTime);
+                                formattedData.push([dateStr, teacherName, 'Normal', inTime, outTime, workingHours, status]);
+                            }
                         }
-                    }
+                    } else {
+                        let headerRowIdx = -1;
+                        for (let i = 0; i < rows.length; i++) {
+                            if (rows[i] && rows[i].includes('Department')) {
+                                headerRowIdx = i;
+                                break;
+                            }
+                        }
 
-                    if (headerRowIdx === -1) {
-                        alert('Could not recognize the file format.');
-                        return;
-                    }
+                        if (headerRowIdx === -1) {
+                            alert('Could not recognize Excel format.');
+                            return;
+                        }
 
-                    const headers = rows[headerRowIdx];
-                    const fNameIdx = headers.indexOf('First Name');
-                    const lNameIdx = headers.indexOf('Last Name');
-                    const deptIdx = headers.indexOf('Department');
-                    const dateIdx = headers.indexOf('Date');
-                    const timetableIdx = headers.indexOf('Timetable');
-                    const inTimeIdx = headers.indexOf('Clock-In Time');
-                    const outTimeIdx = headers.indexOf('Clock-Out Time');
-                    const workHoursIdx = headers.indexOf('Worked Hours');
+                        const headers = rows[headerRowIdx];
+                        const fNameIdx = headers.indexOf('First Name');
+                        const lNameIdx = headers.indexOf('Last Name');
+                        const dateIdx = headers.indexOf('Date');
+                        const inTimeIdx = headers.indexOf('Clock-In Time');
+                        const outTimeIdx = headers.indexOf('Clock-Out Time');
+                        const workHoursIdx = headers.indexOf('Worked Hours');
 
-                    for (let i = headerRowIdx + 1; i < rows.length; i++) {
-                        let r = rows[i];
-                        if (!r || r.length === 0) continue;
-                        
-                        let department = r[deptIdx] || '';
-                        if (department.toString().trim() === 'Teaching department') {
+                        for (let i = headerRowIdx + 1; i < rows.length; i++) {
+                            let r = rows[i];
+                            if (!r || r.length === 0) continue;
                             let firstName = r[fNameIdx] || '';
                             let lastName = (r[lNameIdx] && r[lNameIdx] !== '--') ? r[lNameIdx] : '';
                             let fullName = (firstName + ' ' + lastName).trim();
-                            let date = r[dateIdx] || '';
-                            let timetable = r[timetableIdx] || '';
+                            if (!fullName) continue;
+
+                            let date = r[dateIdx] || '2026-08-04';
                             let inTime = r[inTimeIdx] || '--';
                             let outTime = r[outTimeIdx] || '--';
                             let workedHours = r[workHoursIdx] || calculateWorkingHours(inTime, outTime);
+                            let status = evaluateStatus(inTime, outTime);
 
-                            formattedData.push([date, fullName, timetable, inTime, outTime, workedHours]);
+                            formattedData.push([date, fullName, 'Normal', inTime, outTime, workedHours, status]);
                         }
                     }
-                }
 
-                if (formattedData.length === 1) {
-                    alert('No records could be parsed.');
-                    return;
-                }
+                    finalizeOutput(formattedData, outputFormat);
+                };
+                reader.readAsArrayBuffer(file);
 
-                if (format === 'csv') {
-                    let newSheet = XLSX.utils.aoa_to_sheet(formattedData);
-                    let newWorkbook = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(newWorkbook, newSheet, "Formatted Attendance");
-                    XLSX.writeFile(newWorkbook, "Attendance_July_2026_Formatted.csv");
-                } else if (format === 'pdf') {
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
+            } else if (fileName.endsWith('.pdf')) {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    
+                    let fullText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        textContent.items.forEach(item => {
+                            fullText += item.str + '\n';
+                        });
+                    }
 
-                    doc.setFontSize(16);
-                    doc.text("Teacher Attendance Report", 14, 20);
-                    doc.setFontSize(10);
-                    doc.text("Period: July 2026 | Department: Teaching Staff", 14, 26);
+                    let blocks = fullText.split(/Emp Code/i);
+                    blocks.forEach(block => {
+                        let nameMatch = block.match(/Emp Name[:\s]+([^\n]+)/i);
+                        if (!nameMatch) return;
+                        let empName = nameMatch[1].trim();
+                        empName = empName.replace(/0\d\s+Tue.*$/i, '').trim();
+                        if (!empName || empName.toLowerCase().includes('company name')) return;
 
-                    doc.autoTable({
-                        startY: 32,
-                        head: [formattedData[0]],
-                        body: formattedData.slice(1),
-                        theme: 'grid',
-                        headStyles: { fillColor: [44, 62, 80] },
-                        styles: { fontSize: 8 }
+                        let shiftMatch = block.match(/Shift[:\s\n]+([^\n]+)/i) || block.match(/Shitt[:\s\n]+([^\n]+)/i) || block.match(/Shill[:\s\n]+([^\n]+)/i);
+                        let shift = shiftMatch ? shiftMatch[1].trim() : 'Normal';
+                        if (!shift || shift.length > 20) shift = 'Normal';
+
+                        let inTimeMatch = block.match(/In Time[:\s\n]+(\d{2}:\d{2}\s*[AP]M)/i) || block.match(/In Tinse[:\s\n]+(\d{2}:\d{2}\s*[AP]M)/i);
+                        let outTimeMatch = block.match(/Out Time[:\s\n]+(\d{2}:\d{2}\s*[AP]M)/i) || block.match(/Out Tirtie[:\s\n]+(\d{2}:\d{2}\s*[AP]M)/i);
+
+                        let inTime = inTimeMatch ? inTimeMatch[1].trim() : '--';
+                        let outTime = outTimeMatch ? outTimeMatch[1].trim() : '--';
+                        let workingHours = calculateWorkingHours(inTime, outTime);
+                        let status = evaluateStatus(inTime, outTime);
+
+                        formattedData.push(['2026-08-04', empName, shift, inTime, outTime, workingHours, status]);
                     });
 
-                    doc.save("Attendance_July_2026_Report.pdf");
-                }
-            };
+                    if (formattedData.length === 1) {
+                        alert('Could not parse employee records from this PDF.');
+                        return;
+                    }
 
-            reader.readAsArrayBuffer(file);
+                    finalizeOutput(formattedData, outputFormat);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('Please upload a valid .xlsx, .xls, or .pdf file.');
+            }
+        }
+
+        function finalizeOutput(formattedData, outputFormat) {
+            if (outputFormat === 'csv') {
+                let newSheet = XLSX.utils.aoa_to_sheet(formattedData);
+                let newWorkbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(newWorkbook, newSheet, "Formatted Attendance");
+                XLSX.writeFile(newWorkbook, "Attendance_Professional_Report.csv");
+            } else if (outputFormat === 'pdf') {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(18);
+                doc.setTextColor(30, 41, 59);
+                doc.text("Professional Attendance Report", 14, 18);
+
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(10);
+                doc.setTextColor(100, 116, 139);
+                doc.text("Generated via Attendance Management Utility | Department & Shift Summary", 14, 24);
+
+                doc.autoTable({
+                    startY: 30,
+                    head: [formattedData[0]],
+                    body: formattedData.slice(1),
+                    theme: 'grid',
+                    headStyles: { 
+                        fillColor: [30, 41, 59], 
+                        textColor: [255, 255, 255], 
+                        fontStyle: 'bold',
+                        halign: 'center',
+                        fontSize: 10
+                    },
+                    bodyStyles: { 
+                        textColor: [51, 65, 85],
+                        halign: 'center',
+                        fontSize: 9.5
+                    },
+                    columnStyles: {
+                        1: { halign: 'left' } // Align names to the left
+                    },
+                    alternateRowStyles: { 
+                        fillColor: [248, 250, 252] 
+                    },
+                    styles: { 
+                        cellPadding: 5,
+                        lineWidth: 0.15,
+                        lineColor: [203, 213, 225]
+                    },
+                    didParseCell: function(data) {
+                        // Color-code Status column (index 6)
+                        if (data.section === 'body' && data.column.index === 6) {
+                            let val = data.cell.raw;
+                            if (val === 'Present') {
+                                data.cell.styles.textColor = [16, 185, 129];
+                                data.cell.styles.fontStyle = 'bold';
+                            } else if (val.includes('Absent')) {
+                                data.cell.styles.textColor = [239, 68, 68];
+                                data.cell.styles.fontStyle = 'bold';
+                            }
+                        }
+                    }
+                });
+
+                doc.save("Attendance_Professional_Report.pdf");
+            }
         }
     </script>
 </body>
