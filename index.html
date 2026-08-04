@@ -243,12 +243,12 @@
                 doc.setFont("helvetica", "bold");
                 doc.setFontSize(18);
                 doc.setTextColor(30, 41, 59);
-                doc.text("Professional Attendance Report", 14, 18);
+                doc.text("Biometric Attendance Report", 14, 18);
 
                 doc.setFont("helvetica", "normal");
                 doc.setFontSize(10);
                 doc.setTextColor(100, 116, 139);
-                doc.text("Generated via Attendance Management Utility | Department & Shift Summary", 14, 24);
+
 
                 doc.autoTable({
                     startY: 30,
@@ -293,7 +293,7 @@
                     }
                 });
 
-                doc.save("Attendance_Professional_Report.pdf");
+                doc.save("Biometric_Attendance_Report.pdf");
             }
         }
     </script>
