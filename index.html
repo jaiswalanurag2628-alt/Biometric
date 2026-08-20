@@ -1,499 +1,4346 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Attendance Converter</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SheetJS with styling support for Excel -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-    <!-- pdf.js for reading PDF files -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <!-- jsPDF for generating professional PDF reports -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Professional Biometric Attendance Matrix Generator</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+
+<style>
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.status {
+    display: none;
+}
+
+.gradient-header {
+    background:
+        linear-gradient(
+            135deg,
+            #0f172a 0%,
+            #1e3a8a 55%,
+            #2563eb 100%
+        );
+}
+
+.glass-card {
+    background: rgba(255,255,255,0.96);
+    backdrop-filter: blur(10px);
+}
+
+button {
+    transition: all 0.2s ease;
+}
+
+button:hover {
+    transform: translateY(-1px);
+}
+
+</style>
+
 </head>
-<body class="bg-slate-50 p-8">
-    <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-        <h1 class="text-2xl font-bold text-slate-800 mb-2">Biometric Attendance Generator</h1>
-        <p class="text-slate-600 mb-6">Upload multi-sheet Excel workbooks or PDF attendance files. The utility automatically merges all sheets, formats dates to `dd-mm-yyyy`, adds serial numbers, calculates working hours, evaluates partial absences, and generates presentation-ready reports with professional borders and formatting.</p>
-        
-        <div class="mb-6">
-            <label class="block text-sm font-semibold text-slate-700 mb-2">Select Attendance File (.xlsx, .xls, .pdf)</label>
-            <input type="file" id="fileInput" accept=".xlsx, .xls, .pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-750 hover:file:bg-blue-100 cursor-pointer border border-slate-200 rounded-lg p-2">
+
+
+<body class="bg-slate-100 min-h-screen p-4 md:p-8">
+
+
+<div class="max-w-6xl mx-auto">
+
+
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
+
+    <div class="gradient-header rounded-3xl shadow-2xl overflow-hidden mb-6">
+
+        <div class="p-7 md:p-10 text-white">
+
+            <div class="flex flex-col md:flex-row md:items-center gap-5">
+
+                <div
+                    class="w-16 h-16 rounded-2xl bg-white/15
+                    border border-white/20 flex items-center
+                    justify-center text-3xl shadow-lg">
+
+                    📊
+
+                </div>
+
+
+                <div class="flex-1">
+
+                    <div
+                        class="text-blue-200 text-xs font-bold
+                        uppercase tracking-[0.25em] mb-2">
+
+                        Attendance Management System
+
+                    </div>
+
+
+                    <h1
+                        class="text-3xl md:text-4xl font-extrabold
+                        tracking-tight">
+
+                        Biometric Attendance Matrix
+
+                    </h1>
+
+
+                    <p
+                        class="text-blue-100 mt-2 text-sm md:text-base">
+
+                        Professional Excel & PDF attendance reporting
+
+                    </p>
+
+                </div>
+
+            </div>
+
         </div>
 
-        <div class="flex gap-4">
-            <button onclick="processAndDownload('excel')" class="w-1/2 bg-slate-700 text-white font-semibold py-3 px-4 rounded-xl hover:bg-slate-800 transition duration-200 shadow-sm">
-                Download Excel Report
-            </button>
-            <button onclick="processAndDownload('pdf')" class="w-1/2 bg-blue-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-blue-700 transition duration-200 shadow-sm">
-                Download PDF Report
-            </button>
+
+        <div
+            class="bg-black/20 px-7 md:px-10 py-4
+            text-blue-100 text-sm">
+
+            ✔ All worksheets scanned
+            &nbsp; • &nbsp;
+            ✔ Every employee included
+            &nbsp; • &nbsp;
+            ✔ Professional Excel & PDF reports
+
         </div>
+
     </div>
 
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-        function formatDate(dateStr) {
-            if (!dateStr) return '04-08-2026';
-            try {
-                let clean = dateStr.trim();
-                let d = new Date(clean);
-                if (!isNaN(d.getTime())) {
-                    let day = String(d.getDate()).padStart(2, '0');
-                    let month = String(d.getMonth() + 1).padStart(2, '0');
-                    let year = d.getFullYear();
-                    return `${day}-${month}-${year}`;
-                }
-                return clean;
-            } catch (e) {
-                return '04-08-2026';
-            }
+    <!-- =====================================================
+         MAIN CARD
+    ====================================================== -->
+
+    <div
+        class="glass-card rounded-3xl shadow-xl
+        border border-slate-200 overflow-hidden">
+
+
+        <div class="p-6 md:p-8">
+
+
+            <!-- FILE UPLOAD -->
+
+            <label
+                class="block text-sm font-bold
+                text-slate-700 mb-3">
+
+                Attendance Source Excel File
+
+            </label>
+
+
+            <div
+                class="border-2 border-dashed
+                border-slate-300 rounded-2xl
+                p-6 bg-slate-50 hover:bg-blue-50
+                hover:border-blue-400 transition">
+
+                <input
+                    type="file"
+                    id="fileInput"
+                    accept=".xlsx,.xls"
+                    class="block w-full text-sm text-slate-500
+                    file:mr-4 file:py-3 file:px-5
+                    file:rounded-xl file:border-0
+                    file:text-sm file:font-bold
+                    file:bg-blue-600 file:text-white
+                    hover:file:bg-blue-700 cursor-pointer">
+
+                <p class="text-xs text-slate-500 mt-3">
+
+                    Upload the original biometric attendance
+                    Excel workbook. All worksheets will be examined.
+
+                </p>
+
+            </div>
+
+
+            <!-- STATUS -->
+
+            <div
+                id="status"
+                class="status mt-5 p-4 rounded-xl
+                text-sm font-semibold">
+            </div>
+
+
+            <!-- ACTION BUTTONS -->
+
+            <div
+                class="grid grid-cols-1 md:grid-cols-2
+                gap-4 mt-6">
+
+
+                <button
+                    type="button"
+                    id="excelBtn"
+                    class="bg-slate-900 text-white
+                    font-bold py-4 px-5 rounded-2xl
+                    shadow-lg hover:bg-slate-800">
+
+                    <span class="text-xl mr-2">📊</span>
+
+                    Download Professional Excel
+
+                </button>
+
+
+                <button
+                    type="button"
+                    id="pdfBtn"
+                    class="bg-blue-600 text-white
+                    font-bold py-4 px-5 rounded-2xl
+                    shadow-lg hover:bg-blue-700">
+
+                    <span class="text-xl mr-2">📄</span>
+
+                    Download Professional PDF
+
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- FEATURES -->
+
+        <div
+            class="bg-slate-50 border-t border-slate-200
+            px-6 md:px-8 py-5">
+
+            <div
+                class="grid grid-cols-2 md:grid-cols-4
+                gap-4 text-center">
+
+
+                <div>
+
+                    <div class="text-xl mb-1">
+                        👥
+                    </div>
+
+                    <div
+                        class="text-xs font-bold
+                        text-slate-700">
+
+                        All Employees
+
+                    </div>
+
+                </div>
+
+
+                <div>
+
+                    <div class="text-xl mb-1">
+                        📅
+                    </div>
+
+                    <div
+                        class="text-xs font-bold
+                        text-slate-700">
+
+                        31-Day Matrix
+
+                    </div>
+
+                </div>
+
+
+                <div>
+
+                    <div class="text-xl mb-1">
+                        📈
+                    </div>
+
+                    <div
+                        class="text-xs font-bold
+                        text-slate-700">
+
+                        Statistics
+
+                    </div>
+
+                </div>
+
+
+                <div>
+
+                    <div class="text-xl mb-1">
+                        🎨
+                    </div>
+
+                    <div
+                        class="text-xs font-bold
+                        text-slate-700">
+
+                        Color Coded
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<script>
+
+"use strict";
+
+
+(function () {
+
+
+/* ============================================================
+   CONFIGURATION
+============================================================ */
+
+const CONFIG = {
+
+    companyName:
+        "RD Public School, Betul",
+
+    reportTitle:
+        "BIOMETRIC ATTENDANCE MATRIX REPORT",
+
+    fileName:
+        "Professional_Biometric_Attendance_Report",
+
+    monthStartDay:
+        1,
+
+    standardStartTime:
+        9 * 60
+
+};
+
+
+/* ============================================================
+   DOM
+============================================================ */
+
+const statusBox =
+    document.getElementById("status");
+
+const fileInput =
+    document.getElementById("fileInput");
+
+
+/* ============================================================
+   STATUS
+============================================================ */
+
+function showStatus(message, type) {
+
+    statusBox.style.display = "block";
+
+    statusBox.textContent = message;
+
+
+    if (type === "error") {
+
+        statusBox.className =
+            "status mt-5 p-4 rounded-xl " +
+            "bg-red-50 text-red-700 " +
+            "border border-red-200 text-sm font-semibold";
+
+    }
+
+    else if (type === "success") {
+
+        statusBox.className =
+            "status mt-5 p-4 rounded-xl " +
+            "bg-green-50 text-green-700 " +
+            "border border-green-200 text-sm font-semibold";
+
+    }
+
+    else {
+
+        statusBox.className =
+            "status mt-5 p-4 rounded-xl " +
+            "bg-blue-50 text-blue-700 " +
+            "border border-blue-200 text-sm font-semibold";
+
+    }
+
+}
+
+
+/* ============================================================
+   CLEAN
+============================================================ */
+
+function clean(value) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+        return "";
+    }
+
+    return String(value).trim();
+
+}
+
+
+function normalizeName(value) {
+
+    return clean(value)
+        .replace(/\s+/g, " ")
+        .trim();
+
+}
+
+
+/* ============================================================
+   DAY
+============================================================ */
+
+function isDay(value) {
+
+    return /^(0?[1-9]|[12][0-9]|3[01])$/
+        .test(clean(value));
+
+}
+
+
+function dayNumber(value) {
+
+    return parseInt(
+        clean(value),
+        10
+    );
+
+}
+
+
+/* ============================================================
+   BLOCKED HEADERS
+============================================================ */
+
+function isBlockedHeader(value) {
+
+    const v =
+        normalizeName(value)
+        .toLowerCase();
+
+
+    if (!v) {
+        return true;
+    }
+
+
+    const blocked = [
+
+        "name",
+        "employee",
+        "employee name",
+        "emp name",
+        "emp",
+        "employee id",
+        "emp id",
+        "id",
+
+        "date",
+        "day",
+        "days",
+
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "may",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "oct",
+        "nov",
+        "dec",
+
+        "present",
+        "absent",
+        "present/absent",
+        "present absent",
+        "attendance",
+        "attendance status",
+        "status",
+
+        "in",
+        "out",
+        "in time",
+        "out time",
+        "entry",
+        "exit",
+        "entry time",
+        "exit time",
+        "enter-exit",
+        "enter exit",
+        "punch",
+        "punches",
+        "punch time",
+
+        "total",
+        "total days",
+        "total late",
+        "late",
+        "late days",
+        "working hours",
+        "total hours",
+        "hours",
+        "hrs",
+        "overtime",
+        "ot",
+
+        "serial",
+        "s.no",
+        "sr.no",
+        "sr no",
+        "no",
+        "number",
+
+        "designation",
+        "department",
+        "shift",
+        "remarks",
+        "remark",
+        "holiday",
+        "holidays",
+        "weekly off",
+        "off",
+
+        "grand total",
+        "subtotal",
+        "summary",
+        "report",
+        "details",
+        "month",
+        "year"
+
+    ];
+
+
+    return blocked.includes(v);
+
+}
+
+
+/* ============================================================
+   EMPLOYEE VALIDATION
+============================================================ */
+
+function isValidEmployeeName(value) {
+
+    const name =
+        normalizeName(value);
+
+
+    if (!name) {
+        return false;
+    }
+
+
+    if (
+        isBlockedHeader(name)
+    ) {
+        return false;
+    }
+
+
+    if (
+        /^\d+(\.\d+)?$/.test(name)
+    ) {
+        return false;
+    }
+
+
+    if (
+        /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/
+        .test(name)
+    ) {
+        return false;
+    }
+
+
+    if (
+        name === "#N/A" ||
+        name === "#VALUE!" ||
+        name === "#REF!" ||
+        name === "#DIV/0!"
+    ) {
+        return false;
+    }
+
+
+    return true;
+
+}
+
+
+/* ============================================================
+   TIME PARSER
+============================================================ */
+
+function timeToMinutes(value) {
+
+    let s =
+        clean(value)
+        .toUpperCase();
+
+
+    if (
+        !s ||
+        s === "--" ||
+        s === "-" ||
+        s === "0"
+    ) {
+        return null;
+    }
+
+
+    s =
+        s.replace(/\./g, ":");
+
+
+    const ampm =
+        s.match(/\b(AM|PM)\b/);
+
+
+    const match =
+        s.match(
+            /(\d{1,2}):(\d{1,2})/
+        );
+
+
+    if (!match) {
+        return null;
+    }
+
+
+    let hours =
+        parseInt(
+            match[1],
+            10
+        );
+
+
+    const minutes =
+        parseInt(
+            match[2],
+            10
+        );
+
+
+    if (
+        Number.isNaN(hours) ||
+        Number.isNaN(minutes)
+    ) {
+        return null;
+    }
+
+
+    if (ampm) {
+
+        if (
+            ampm[1] === "PM" &&
+            hours < 12
+        ) {
+            hours += 12;
         }
 
-        function calculateWorkingHours(inStr, outStr) {
-            if (!inStr || !outStr || inStr === '--' || outStr === '--' || inStr.trim() === '' || outStr.trim() === '') return '00:00';
-            try {
-                const parseTime = (tStr) => {
-                    const cleanStr = tStr.trim().toUpperCase();
-                    const parts = cleanStr.split(' ');
-                    const timeParts = parts[0].split(':');
-                    if (timeParts.length < 2) return 0;
-                    let hours = parseInt(timeParts[0], 10);
-                    let minutes = parseInt(timeParts[1], 10);
-                    const modifier = parts[1] || '';
-                    if (modifier === 'PM' && hours < 12) hours += 12;
-                    if (modifier === 'AM' && hours === 12) hours = 0;
-                    return hours * 60 + minutes;
-                };
 
-                let inMins = parseTime(inStr);
-                let outMins = parseTime(outStr);
-                let diffMins = outMins - inMins;
-                if (diffMins < 0) diffMins += 24 * 60;
-
-                let workHours = Math.floor(diffMins / 60);
-                let workMins = diffMins % 60;
-                return `${String(workHours).padStart(2, '0')}:${String(workMins).padStart(2, '0')}`;
-            } catch (err) {
-                return '00:00';
-            }
+        if (
+            ampm[1] === "AM" &&
+            hours === 12
+        ) {
+            hours = 0;
         }
 
-        function evaluateStatus(inTime, outTime) {
-            let hasIn = inTime && inTime !== '--' && inTime.trim() !== '';
-            let hasOut = outTime && outTime !== '--' && outTime.trim() !== '';
+    }
 
-            if (hasIn && hasOut) return 'Present';
-            if (!hasIn && !hasOut) return 'Full Day Absent';
-            if (!hasIn) return 'First Half Absent';
-            return 'Second Half Absent';
-        }
 
-        async function processAndDownload(outputFormat) {
-            const fileInput = document.getElementById('fileInput');
-            if (fileInput.files.length === 0) {
-                alert('Please select an attendance file first!');
-                return;
+    if (
+        hours > 23 ||
+        minutes > 59
+    ) {
+        return null;
+    }
+
+
+    return (
+        hours * 60 +
+        minutes
+    );
+
+}
+
+
+/* ============================================================
+   WORKING HOURS
+============================================================ */
+
+function calculateWorkingHours(
+    inTime,
+    outTime
+) {
+
+    const inMinutes =
+        timeToMinutes(inTime);
+
+    const outMinutes =
+        timeToMinutes(outTime);
+
+
+    if (
+        inMinutes === null ||
+        outMinutes === null
+    ) {
+        return "00:00";
+    }
+
+
+    let difference =
+        outMinutes -
+        inMinutes;
+
+
+    if (difference < 0) {
+
+        difference +=
+            24 * 60;
+
+    }
+
+
+    const hours =
+        Math.floor(
+            difference / 60
+        );
+
+
+    const minutes =
+        difference % 60;
+
+
+    return (
+        String(hours)
+            .padStart(2, "0") +
+        ":" +
+        String(minutes)
+            .padStart(2, "0")
+    );
+
+}
+
+
+/* ============================================================
+   PUNCH PARSER
+============================================================ */
+
+function parsePunch(value) {
+
+    const raw =
+        clean(value);
+
+
+    if (
+        !raw ||
+        raw === "-" ||
+        raw === "--" ||
+        raw === "0" ||
+        raw === "00" ||
+        raw === "0.0"
+    ) {
+
+        return {
+
+            in: "--",
+
+            out: "--",
+
+            hrs: "00:00",
+
+            present: false,
+
+            late: false
+
+        };
+
+    }
+
+
+    const parts =
+        raw.split(
+            /\s*[-–—]\s*/
+        );
+
+
+    if (
+        parts.length < 2
+    ) {
+
+        const inTime =
+            clean(parts[0]);
+
+
+        const inMinutes =
+            timeToMinutes(
+                inTime
+            );
+
+
+        return {
+
+            in: inTime,
+
+            out: "--",
+
+            hrs: "00:00",
+
+            present: true,
+
+            late:
+                inMinutes !== null &&
+                inMinutes >
+                    CONFIG.standardStartTime
+
+        };
+
+    }
+
+
+    const inTime =
+        clean(parts[0]) ||
+        "--";
+
+
+    const outTime =
+        clean(
+            parts
+                .slice(1)
+                .join("-")
+        ) ||
+        "--";
+
+
+    const inMinutes =
+        timeToMinutes(inTime);
+
+
+    return {
+
+        in: inTime,
+
+        out: outTime,
+
+        hrs:
+            calculateWorkingHours(
+                inTime,
+                outTime
+            ),
+
+        present: true,
+
+        late:
+            inMinutes !== null &&
+            inMinutes >
+                CONFIG.standardStartTime
+
+    };
+
+}
+
+
+/* ============================================================
+   FIND NAME ROW
+============================================================ */
+
+function findNameRow(rows) {
+
+    for (
+        let r = 0;
+        r < Math.min(
+            rows.length,
+            30
+        );
+        r++
+    ) {
+
+        const row =
+            rows[r] || [];
+
+
+        for (
+            let c = 0;
+            c < row.length;
+            c++
+        ) {
+
+            const value =
+                normalizeName(
+                    row[c]
+                )
+                .toLowerCase();
+
+
+            if (
+                value === "name" ||
+                value === "employee name" ||
+                value === "emp name"
+            ) {
+
+                return r;
+
             }
 
-            const file = fileInput.files[0];
-            const reader = new FileReader();
+        }
 
-            reader.onload = async function(e) {
-                const arrayBuffer = e.target.result;
-                const fileName = file.name.toLowerCase();
-                let rawRecords = [];
+    }
 
-                if (fileName.endsWith('.pdf')) {
-                    const typedarray = new Uint8Array(arrayBuffer);
-                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
-                    let fullText = '';
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        textContent.items.forEach(item => {
-                            fullText += item.str + '\n';
-                        });
-                    }
 
-                    let blocks = fullText.split(/Emp Code/i);
-                    if (blocks.length <= 1) {
-                        blocks = fullText.split(/\n(?=\d{4}-\d{2}-\d{2})/);
-                    }
+    return -1;
 
-                    blocks.forEach(block => {
-                        let nameMatch = block.match(/Emp Name[:\s]+([^\n]+)/i) || block.match(/Name[:\s]+([^\n]+)/i);
-                        if (!nameMatch) return;
-                        let empName = nameMatch[1].trim();
-                        empName = empName.replace(/0\d\s+Tue.*$/i, '').trim();
-                        if (!empName || empName.toLowerCase().includes('company name')) return;
+}
 
-                        let shiftMatch = block.match(/Shift[:\s\n]+([^\n]+)/i) || block.match(/Shitt[:\s\n]+([^\n]+)/i) || block.match(/Shill[:\s\n]+([^\n]+)/i);
-                        let shift = shiftMatch ? shiftMatch[1].trim() : 'Normal';
-                        if (!shift || shift.length > 20) shift = 'Normal';
 
-                        let inTimeMatch = block.match(/In Time[:\s\n]+(\d{2}:\d{2}\s*[AP]M)/i) || block.match(/In Tinse[:\s\n]+(\d{2}:\d{2}\s*[AP]M)/i);
-                        let outTimeMatch = block.match(/Out Time[:\s\n]+(\d{2}:\d{2}\s*[AP]M)/i) || block.match(/Out Tirtie[:\s\n]+(\d{2}:\d{2}\s*[AP]M)/i);
+/* ============================================================
+   FIND DAY ROW
+============================================================ */
 
-                        let inTime = inTimeMatch ? inTimeMatch[1].trim() : '--';
-                        let outTime = outTimeMatch ? outTimeMatch[1].trim() : '--';
-                        let workingHours = calculateWorkingHours(inTime, outTime);
-                        let status = evaluateStatus(inTime, outTime);
+function findFirstDayRow(
+    rows,
+    nameRow
+) {
 
-                        rawRecords.push({
-                            date: formatDate('04-08-2026'),
-                            name: empName,
-                            shift: shift,
-                            inTime: inTime,
-                            outTime: outTime,
-                            workingHours: workingHours,
-                            status: status
-                        });
-                    });
+    for (
+        let r = nameRow + 1;
+        r < rows.length;
+        r++
+    ) {
 
-                } else {
-                    let textDecoder = new TextDecoder("utf-8");
-                    let textContent = textDecoder.decode(arrayBuffer);
+        const row =
+            rows[r] || [];
 
-                    if (textContent.includes('<?xml') && textContent.includes('Workbook')) {
-                        let parser = new DOMParser();
-                        let xmlDoc = parser.parseFromString(textContent, "text/xml");
-                        let worksheets = xmlDoc.getElementsByTagName("Worksheet");
 
-                        for (let ws of worksheets) {
-                            let sheetName = ws.getAttribute("ss:Name") || "Normal";
-                            let shift = sheetName;
+        if (
+            isDay(row[0])
+        ) {
 
-                            let table = ws.getElementsByTagName("Table")[0];
-                            if (!table) continue;
-                            let xmlRows = table.getElementsByTagName("Row");
+            return r;
 
-                            let rowsData = [];
-                            for (let r of xmlRows) {
-                                let rowVals = [];
-                                let cells = r.getElementsByTagName("Cell");
-                                for (let c of cells) {
-                                    let data = c.getElementsByTagName("Data")[0];
-                                    rowVals.push(data ? data.textContent.trim() : "");
-                                }
-                                rowsData.push(rowVals);
-                            }
+        }
 
-                            if (rowsData.length > 0 && rowsData[0][0]) {
-                                let firstLine = rowsData[0][0];
-                                if (firstLine.includes('Shift Time') || firstLine.includes('for periods')) {
-                                    let p = firstLine.split(/[,:]/);
-                                    if (p.length > 0) shift = p[0].trim();
-                                }
-                            }
 
-                            let isFormat1Block = rowsData.some(r => r.some(c => c && c.includes('Emp Name:')));
+        if (
+            row.some(
+                value =>
+                    isDay(value)
+            )
+        ) {
 
-                            if (isFormat1Block) {
-                                let currentName = '';
-                                let currentIn = '--';
-                                let currentOut = '--';
+            return r;
 
-                                for (let r of rowsData) {
-                                    let lineStr = r.join(' | ');
-                                    let nameMatch = lineStr.match(/Emp Name[:\s]?([^\n|]+)/i);
-                                    if (nameMatch) {
-                                        if (currentName) {
-                                            let wh = calculateWorkingHours(currentIn, currentOut);
-                                            let st = evaluateStatus(currentIn, currentOut);
-                                            rawRecords.push({
-                                                date: formatDate('04-08-2026'),
-                                                name: currentName.trim().replace(/\s+/g, ' '),
-                                                shift: shift,
-                                                inTime: currentIn,
-                                                outTime: currentOut,
-                                                workingHours: wh,
-                                                status: st
-                                            });
-                                        }
-                                        currentName = nameMatch[1].trim();
-                                        currentIn = '--';
-                                        currentOut = '--';
-                                    }
-                                    if (lineStr.includes('In Time')) {
-                                        let idx = r.findIndex(c => c && c.includes('In Time'));
-                                        if (idx !== -1 && r[idx + 1]) currentIn = r[idx + 1].trim();
-                                    }
-                                    if (lineStr.includes('Out Time')) {
-                                        let idx = r.findIndex(c => c && c.includes('Out Time'));
-                                        if (idx !== -1 && r[idx + 1]) currentOut = r[idx + 1].trim();
-                                    }
-                                }
-                                if (currentName) {
-                                    let wh = calculateWorkingHours(currentIn, currentOut);
-                                    let st = evaluateStatus(currentIn, currentOut);
-                                    rawRecords.push({
-                                        date: formatDate('04-08-2026'),
-                                        name: currentName.trim().replace(/\s+/g, ' '),
-                                        shift: shift,
-                                        inTime: currentIn,
-                                        outTime: currentOut,
-                                        workingHours: wh,
-                                        status: st
-                                    });
-                                }
-                            } else {
-                                let headerIdx = -1;
-                                for (let i = 0; i < rowsData.length; i++) {
-                                    if (rowsData[i].some(c => c === 'Name' || c === 'First Name' || c === 'Enter At' || c === 'Clock-In Time')) {
-                                        headerIdx = i;
-                                        break;
-                                    }
-                                }
+        }
 
-                                if (headerIdx !== -1) {
-                                    let h = rowsData[headerIdx];
-                                    let nIdx = h.indexOf('Name'); if (nIdx === -1) nIdx = h.indexOf('First Name');
-                                    let inIdx = h.indexOf('Enter At'); if (inIdx === -1) inIdx = h.indexOf('Clock-In Time');
-                                    let outIdx = h.indexOf('Exit At'); if (outIdx === -1) outIdx = h.indexOf('Clock-Out Time');
+    }
 
-                                    for (let i = headerIdx + 1; i < rowsData.length; i++) {
-                                        let r = rowsData[i];
-                                        if (!r || r.length === 0) continue;
-                                        let name = nIdx !== -1 ? (r[nIdx] || '').trim() : '';
-                                        if (!name || name === 'Teacher Details' || name === 'Sl. No') continue;
 
-                                        let inTime = inIdx !== -1 ? (r[inIdx] || '--').trim() : '--';
-                                        let outTime = outIdx !== -1 ? (r[outIdx] || '--').trim() : '--';
-                                        if (!inTime) inTime = '--';
-                                        if (!outTime) outTime = '--';
+    return -1;
 
-                                        let wh = calculateWorkingHours(inTime, outTime);
-                                        let st = evaluateStatus(inTime, outTime);
-                                        rawRecords.push({
-                                            date: formatDate('04-08-2026'),
-                                            name: name,
-                                            shift: shift,
-                                            inTime: inTime,
-                                            outTime: outTime,
-                                            workingHours: wh,
-                                            status: st
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-                        workbook.SheetNames.forEach(sheetName => {
-                            const worksheet = workbook.Sheets[sheetName];
-                            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                            if (!rows || rows.length === 0) return;
+}
 
-                            let headerRowIdx = -1;
-                            for (let i = 0; i < rows.length; i++) {
-                                if (rows[i] && rows[i].some(c => c && (c.toString().includes('Name') || c.toString().includes('Department')))) {
-                                    headerRowIdx = i;
-                                    break;
-                                }
-                            }
 
-                            if (headerRowIdx !== -1) {
-                                const headers = rows[headerRowIdx];
-                                const nIdx = headers.findIndex(h => h && h.toString().includes('Name'));
-                                const inIdx = headers.findIndex(h => h && h.includes('In'));
-                                const outIdx = headers.findIndex(h => h && h.includes('Out'));
-                                const dateIdx = headers.findIndex(h => h && h.includes('Date'));
+/* ============================================================
+   DETECT EMPLOYEES
+============================================================ */
 
-                                for (let i = headerRowIdx + 1; i < rows.length; i++) {
-                                    let r = rows[i];
-                                    if (!r || r.length === 0) continue;
-                                    let name = nIdx !== -1 ? (r[nIdx] || '').trim() : '';
-                                    if (!name) continue;
+function detectEmployees(
+    rows,
+    nameRow,
+    firstDayRow,
+    employeeCounter
+) {
 
-                                    let rawDate = dateIdx !== -1 ? r[dateIdx] : '04-08-2026';
-                                    let dateStr = formatDate(rawDate);
-                                    let inTime = inIdx !== -1 ? (r[inIdx] || '--').trim() : '--';
-                                    let outTime = outIdx !== -1 ? (r[outIdx] || '--').trim() : '--';
-                                    let wh = calculateWorkingHours(inTime, outTime);
-                                    let st = evaluateStatus(inTime, outTime);
+    const header =
+        rows[nameRow] || [];
 
-                                    rawRecords.push({
-                                        date: dateStr,
-                                        name: name,
-                                        shift: sheetName,
-                                        inTime: inTime,
-                                        outTime: outTime,
-                                        workingHours: wh,
-                                        status: st
-                                    });
-                                }
-                            }
-                        });
-                    }
+
+    const result = [];
+
+
+    const nameIndex =
+        header.findIndex(
+            value =>
+                normalizeName(value)
+                    .toLowerCase() ===
+                "name"
+        );
+
+
+    const startColumn =
+        nameIndex >= 0
+            ? nameIndex + 1
+            : 0;
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Employee is added based ONLY on
+     * employee name.
+     *
+     * Attendance data is NOT required.
+     */
+
+    for (
+        let c = startColumn;
+        c < header.length;
+        c++
+    ) {
+
+        const employeeName =
+            normalizeName(
+                header[c]
+            );
+
+
+        if (
+            !isValidEmployeeName(
+                employeeName
+            )
+        ) {
+            continue;
+        }
+
+
+        result.push({
+
+            colIdx: c,
+
+            name: employeeName,
+
+            id:
+                "EMP-" +
+                String(
+                    employeeCounter +
+                    result.length +
+                    1
+                ).padStart(
+                    3,
+                    "0"
+                ),
+
+            totalLate: 0,
+
+            presentDays: 0,
+
+            days: {}
+
+        });
+
+    }
+
+
+    /*
+     * Read all days.
+     */
+
+    for (
+        let r = firstDayRow;
+        r < rows.length;
+        r++
+    ) {
+
+        const row =
+            rows[r] || [];
+
+
+        if (
+            !isDay(row[0])
+        ) {
+            continue;
+        }
+
+
+        const day =
+            dayNumber(row[0]);
+
+
+        if (
+            day < 1 ||
+            day > 31
+        ) {
+            continue;
+        }
+
+
+        const dayKey =
+            String(day)
+                .padStart(
+                    2,
+                    "0"
+                );
+
+
+        result.forEach(
+            emp => {
+
+                const value =
+                    clean(
+                        row[
+                            emp.colIdx
+                        ]
+                    );
+
+
+                const punch =
+                    parsePunch(
+                        value
+                    );
+
+
+                emp.days[
+                    dayKey
+                ] = punch;
+
+
+                if (
+                    punch.present
+                ) {
+
+                    emp.presentDays++;
+
                 }
 
-                if (rawRecords.length === 0) {
-                    alert('Could not parse records from this file. Please verify the format.');
-                    return;
+
+                if (
+                    punch.late
+                ) {
+
+                    emp.totalLate++;
+
                 }
 
-                let formattedData = [["Sl. No.", "Date", "Teacher / Employee Name", "Shift", "In Time", "Out Time", "Working Hours", "Status"]];
-                rawRecords.forEach((rec, idx) => {
-                    formattedData.push([
-                        idx + 1,
-                        rec.date,
-                        rec.name,
-                        rec.shift,
-                        rec.inTime,
-                        rec.outTime,
-                        rec.workingHours,
-                        rec.status
-                    ]);
-                });
+            }
+        );
 
-                if (outputFormat === 'excel') {
-                    // Styled Excel export using xlsx-js-style
-                    const ws = XLSX.utils.aoa_to_sheet(formattedData);
-                    
-                    // Define professional styling rules
-                    const headerStyle = {
-                        font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                        fill: { fgColor: { rgb: "1E293B" } }, // Dark Slate
-                        alignment: { horizontal: "center", vertical: "center" },
-                        border: {
-                            top: { style: "thin", color: { rgb: "CBD5E1" } },
-                            bottom: { style: "thin", color: { rgb: "CBD5E1" } },
-                            left: { style: "thin", color: { rgb: "CBD5E1" } },
-                            right: { style: "thin", color: { rgb: "CBD5E1" } }
-                        }
+    }
+
+
+    /*
+     * Fill missing days.
+     */
+
+    result.forEach(
+        emp => {
+
+            for (
+                let d = 1;
+                d <= 31;
+                d++
+            ) {
+
+                const day =
+                    String(d)
+                        .padStart(
+                            2,
+                            "0"
+                        );
+
+
+                if (
+                    !emp.days[day]
+                ) {
+
+                    emp.days[day] = {
+
+                        in: "--",
+
+                        out: "--",
+
+                        hrs: "00:00",
+
+                        present: false,
+
+                        late: false
+
                     };
 
-                    const cellStyle = {
-                        font: { name: "Arial", sz: 10, color: { rgb: "334155" } },
-                        alignment: { horizontal: "center", vertical: "center" },
-                        border: {
-                            top: { style: "thin", color: { rgb: "CBD5E1" } },
-                            bottom: { style: "thin", color: { rgb: "CBD5E1" } },
-                            left: { style: "thin", color: { rgb: "CBD5E1" } },
-                            right: { style: "thin", color: { rgb: "CBD5E1" } }
-                        }
-                    };
+                }
 
-                    const leftCellStyle = Object.assign({}, cellStyle, { alignment: { horizontal: "left", vertical: "center" } });
+            }
 
-                    // Apply styles across cells
-                    const range = XLSX.utils.decode_range(ws['!ref']);
-                    for (let R = range.s.r; R <= range.e.r; ++R) {
-                        for (let C = range.s.c; C <= range.e.c; ++C) {
-                            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                            if (!ws[cellAddress]) continue;
-                            if (R === 0) {
-                                ws[cellAddress].s = headerStyle;
-                            } else {
-                                if (C === 2) {
-                                    ws[cellAddress].s = leftCellStyle; // Name column left-aligned
-                                } else {
-                                    ws[cellAddress].s = cellStyle;
-                                }
-                                // Status styling (Green for Present, Red for Absent)
-                                if (C === 7) {
-                                    let val = ws[cellAddress].v;
-                                    if (val === 'Present') {
-                                        ws[cellAddress].s = Object.assign({}, cellStyle, { font: { name: "Arial", sz: 10, bold: true, color: { rgb: "10B981" } } });
-                                    } else if (val.includes('Absent')) {
-                                        ws[cellAddress].s = Object.assign({}, cellStyle, { font: { name: "Arial", sz: 10, bold: true, color: { rgb: "EF4444" } } });
-                                    }
-                                }
-                            }
-                        }
+        }
+    );
+
+
+    return result;
+
+}
+
+
+/* ============================================================
+   PARSE WORKSHEET
+============================================================ */
+
+function parseWorksheet(
+    sheet,
+    sheetName,
+    employeeCounter
+) {
+
+    const rows =
+        XLSX.utils.sheet_to_json(
+            sheet,
+            {
+
+                header: 1,
+
+                defval: "",
+
+                raw: false
+
+            }
+        );
+
+
+    if (
+        !rows ||
+        rows.length < 2
+    ) {
+
+        return {
+
+            employees: [],
+
+            sheetName
+
+        };
+
+    }
+
+
+    const nameRow =
+        findNameRow(rows);
+
+
+    if (
+        nameRow < 0
+    ) {
+
+        return {
+
+            employees: [],
+
+            sheetName
+
+        };
+
+    }
+
+
+    const firstDayRow =
+        findFirstDayRow(
+            rows,
+            nameRow
+        );
+
+
+    if (
+        firstDayRow < 0
+    ) {
+
+        return {
+
+            employees: [],
+
+            sheetName
+
+        };
+
+    }
+
+
+    return {
+
+        employees:
+            detectEmployees(
+                rows,
+                nameRow,
+                firstDayRow,
+                employeeCounter
+            ),
+
+        sheetName
+
+    };
+
+}
+
+
+/* ============================================================
+   READ WORKBOOK
+============================================================ */
+
+async function readExcelFile(file) {
+
+    if (
+        typeof XLSX ===
+        "undefined"
+    ) {
+
+        throw new Error(
+            "Excel library failed to load."
+        );
+
+    }
+
+
+    const buffer =
+        await file.arrayBuffer();
+
+
+    const workbook =
+        XLSX.read(
+            buffer,
+            {
+
+                type: "array",
+
+                cellDates: false,
+
+                cellNF: false,
+
+                cellText: true
+
+            }
+        );
+
+
+    let employees = [];
+
+    let employeeCounter = 0;
+
+    const usedSheets = [];
+
+
+    workbook.SheetNames.forEach(
+        sheetName => {
+
+            try {
+
+                const result =
+                    parseWorksheet(
+                        workbook.Sheets[
+                            sheetName
+                        ],
+                        sheetName,
+                        employeeCounter
+                    );
+
+
+                if (
+                    result.employees.length
+                ) {
+
+                    employees =
+                        employees.concat(
+                            result.employees
+                        );
+
+
+                    employeeCounter +=
+                        result.employees.length;
+
+
+                    usedSheets.push(
+                        sheetName
+                    );
+
+                }
+
+            }
+
+            catch (error) {
+
+                console.warn(
+                    "Sheet parsing error:",
+                    sheetName,
+                    error
+                );
+
+            }
+
+        }
+    );
+
+
+    /*
+     * Merge duplicate employee names.
+     */
+
+    const map =
+        new Map();
+
+
+    employees.forEach(
+        emp => {
+
+            const key =
+                emp.name
+                    .toLowerCase()
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
+
+
+            if (
+                !map.has(key)
+            ) {
+
+                map.set(
+                    key,
+                    emp
+                );
+
+            }
+
+            else {
+
+                const existing =
+                    map.get(key);
+
+
+                for (
+                    let d = 1;
+                    d <= 31;
+                    d++
+                ) {
+
+                    const day =
+                        String(d)
+                            .padStart(
+                                2,
+                                "0"
+                            );
+
+
+                    const oldPunch =
+                        existing.days[
+                            day
+                        ];
+
+
+                    const newPunch =
+                        emp.days[
+                            day
+                        ];
+
+
+                    if (
+                        !oldPunch.present &&
+                        newPunch.present
+                    ) {
+
+                        existing.days[
+                            day
+                        ] =
+                            newPunch;
+
                     }
 
-                    // Set column widths for presentation
-                    ws['!cols'] = [
-                        { wch: 8 },  // Sl. No
-                        { wch: 14 }, // Date
-                        { wch: 30 }, // Name
-                        { wch: 22 }, // Shift
-                        { wch: 12 }, // In Time
-                        { wch: 12 }, // Out Time
-                        { wch: 16 }, // Working Hours
-                        { wch: 22 }  // Status
+                }
+
+            }
+
+        }
+    );
+
+
+    const unique =
+        Array.from(
+            map.values()
+        );
+
+
+    /*
+     * Recalculate statistics.
+     */
+
+    unique.forEach(
+        (emp, index) => {
+
+            emp.id =
+                "EMP-" +
+                String(
+                    index + 1
+                ).padStart(
+                    3,
+                    "0"
+                );
+
+
+            emp.totalLate = 0;
+
+            emp.presentDays = 0;
+
+
+            for (
+                let d = 1;
+                d <= 31;
+                d++
+            ) {
+
+                const day =
+                    String(d)
+                        .padStart(
+                            2,
+                            "0"
+                        );
+
+
+                const punch =
+                    emp.days[
+                        day
                     ];
 
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Consolidated Attendance");
-                    XLSX.writeFile(wb, "Biometric_Consolidated_Report.xlsx");
 
-                } else if (outputFormat === 'pdf') {
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                if (
+                    punch.present
+                ) {
 
-                    doc.setFillColor(30, 41, 59);
-                    doc.rect(0, 0, 297, 12, 'F');
+                    emp.presentDays++;
 
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(14);
-                    doc.setTextColor(255, 255, 255);
-                    doc.text("BIOMETRIC ATTENDANCE CONSOLIDATED REPORT", 14, 8.5);
-
-                    doc.setFont("helvetica", "normal");
-                    doc.setFontSize(9);
-                    doc.setTextColor(100, 116, 139);
-                    doc.text("Multi-Sheet Summary | Formatted Date & Serialized Index", 14, 20);
-
-                    doc.autoTable({
-                        startY: 24,
-                        head: [formattedData[0]],
-                        body: formattedData.slice(1),
-                        theme: 'grid',
-                        headStyles: { 
-                            fillColor: [30, 41, 59], 
-                            textColor: [255, 255, 255], 
-                            fontStyle: 'bold',
-                            halign: 'center',
-                            fontSize: 10
-                        },
-                        bodyStyles: { 
-                            textColor: [51, 65, 85],
-                            halign: 'center',
-                            fontSize: 9.5
-                        },
-                        columnStyles: {
-                            0: { halign: 'center', cellWidth: 16 },
-                            1: { halign: 'center', cellWidth: 28 },
-                            2: { halign: 'left', cellWidth: 60 }
-                        },
-                        alternateRowStyles: { 
-                            fillColor: [248, 250, 252] 
-                        },
-                        styles: { 
-                            cellPadding: 4.5,
-                            lineWidth: 0.15,
-                            lineColor: [203, 213, 225]
-                        },
-                        didParseCell: function(data) {
-                            if (data.section === 'body' && data.column.index === 7) {
-                                let val = data.cell.raw;
-                                if (val === 'Present') {
-                                    data.cell.styles.textColor = [16, 185, 129];
-                                    data.cell.styles.fontStyle = 'bold';
-                                } else if (val.includes('Absent')) {
-                                    data.cell.styles.textColor = [239, 68, 68];
-                                    data.cell.styles.fontStyle = 'bold';
-                                }
-                            }
-                        },
-                        didDrawPage: function(data) {
-                            doc.setFontSize(8);
-                            doc.setTextColor(150);
-                            doc.text(`Page ${doc.internal.getNumberOfPages()}`, data.settings.margin.left, doc.internal.pageSize.height - 10);
-                        }
-                    });
-
-                    doc.save("Biometric_Consolidated_Report.pdf");
                 }
-            };
-            reader.readAsArrayBuffer(file);
+
+
+                if (
+                    punch.late
+                ) {
+
+                    emp.totalLate++;
+
+                }
+
+            }
+
         }
-    </script>
+    );
+
+
+    return {
+
+        employees:
+            unique,
+
+        sheets:
+            workbook.SheetNames,
+
+        usedSheets
+
+    };
+
+}
+
+
+/* ============================================================
+   REPORT STATISTICS
+============================================================ */
+
+function getStatistics(
+    employees
+) {
+
+    const totalEmployees =
+        employees.length;
+
+
+    const employeesWithAttendance =
+        employees.filter(
+            emp =>
+                emp.presentDays > 0
+        ).length;
+
+
+    const totalPresentDays =
+        employees.reduce(
+            (sum, emp) =>
+                sum +
+                emp.presentDays,
+            0
+        );
+
+
+    const totalLate =
+        employees.reduce(
+            (sum, emp) =>
+                sum +
+                emp.totalLate,
+            0
+        );
+
+
+    const possibleAttendance =
+        totalEmployees * 31;
+
+
+    const attendanceRate =
+        possibleAttendance > 0
+            ? (
+                totalPresentDays /
+                possibleAttendance
+            ) * 100
+            : 0;
+
+
+    return {
+
+        totalEmployees,
+
+        employeesWithAttendance,
+
+        totalPresentDays,
+
+        totalLate,
+
+        attendanceRate
+
+    };
+
+}
+
+
+/* ============================================================
+   PERIOD
+============================================================ */
+
+function getPeriodText() {
+
+    const now =
+        new Date();
+
+
+    const months = [
+
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec"
+
+    ];
+
+
+    return (
+        "01-" +
+        months[
+            now.getMonth()
+        ] +
+        "-" +
+        now.getFullYear() +
+        " to " +
+        String(
+            now.getDate()
+        ).padStart(
+            2,
+            "0"
+        ) +
+        "-" +
+        months[
+            now.getMonth()
+        ] +
+        "-" +
+        now.getFullYear()
+    );
+
+}
+
+
+/* ============================================================
+   EXCEL COLOR CONSTANTS
+============================================================ */
+
+const COLORS = {
+
+    navy:
+        "F7F3F2",
+
+    blue:
+        "1D4ED8",
+
+    lightBlue:
+        "DBEAFE",
+
+    sky:
+        "EFF6FF",
+
+    green:
+        "DCFCE7",
+
+    greenText:
+        "166534",
+
+    yellow:
+        "FEF3C7",
+
+    yellowText:
+        "92400E",
+
+    grey:
+        "F1F5F9",
+
+    greyText:
+        "64748B",
+
+    white:
+        "FFFFFF",
+
+    border:
+        "CBD5E1",
+
+    dark:
+        "334155"
+
+};
+
+
+/* ============================================================
+   EXCEL BORDER
+============================================================ */
+
+function excelBorder() {
+
+    return {
+
+        top: {
+            style: "thin",
+            color: {
+                rgb: COLORS.border
+            }
+        },
+
+        bottom: {
+            style: "thin",
+            color: {
+                rgb: COLORS.border
+            }
+        },
+
+        left: {
+            style: "thin",
+            color: {
+                rgb: COLORS.border
+            }
+        },
+
+        right: {
+            style: "thin",
+            color: {
+                rgb: COLORS.border
+            }
+        }
+
+    };
+
+}
+
+
+/* ============================================================
+   EXCEL REPORT
+============================================================ */
+
+function generateExcel(
+    employees
+) {
+
+    const stats =
+        getStatistics(
+            employees
+        );
+
+
+    const data = [];
+
+
+    /*
+     * Title section.
+     */
+
+    data.push([
+        CONFIG.companyName
+    ]);
+
+
+    data.push([
+        CONFIG.reportTitle
+    ]);
+
+
+    data.push([
+        "Attendance Period: " +
+        getPeriodText()
+    ]);
+
+
+    data.push([
+        "Generated: " +
+        new Date().toLocaleString()
+    ]);
+
+
+    data.push([
+        ""
+    ]);
+
+
+    /*
+     * Summary.
+     */
+
+    data.push([
+        "REPORT SUMMARY",
+        "",
+        "",
+        "",
+        "",
+        ""
+    ]);
+
+
+    data.push([
+        "Total Employees",
+        stats.totalEmployees,
+        "Employees With Attendance",
+        stats.employeesWithAttendance,
+        "Total Late",
+        stats.totalLate
+    ]);
+
+
+    data.push([
+        "Total Present Days",
+        stats.totalPresentDays,
+        "Attendance Rate",
+        stats.attendanceRate.toFixed(2) + "%",
+        "",
+        ""
+    ]);
+
+
+    data.push([
+        ""
+    ]);
+
+
+    /*
+     * Main matrix header.
+     */
+
+    const header = [
+
+        "EMPLOYEE NAME",
+
+        "EMP ID",
+
+        "TOTAL LATE"
+
+    ];
+
+
+    for (
+        let d = 1;
+        d <= 31;
+        d++
+    ) {
+
+        header.push(
+            "DAY " + d
+        );
+
+    }
+
+
+    data.push(header);
+
+
+    /*
+     * Employee rows.
+     */
+
+    employees.forEach(
+        emp => {
+
+            const row = [
+
+                emp.name,
+
+                emp.id,
+
+                emp.totalLate
+
+            ];
+
+
+            for (
+                let d = 1;
+                d <= 31;
+                d++
+            ) {
+
+                const day =
+                    String(d)
+                        .padStart(
+                            2,
+                            "0"
+                        );
+
+
+                const info =
+                    emp.days[
+                        day
+                    ];
+
+
+                if (
+                    info &&
+                    info.present
+                ) {
+
+                    row.push(
+
+                        info.in +
+                        "\n" +
+                        info.out +
+                        "\n" +
+                        info.hrs
+
+                    );
+
+                }
+
+                else {
+
+                    row.push(
+                        "—"
+                    );
+
+                }
+
+            }
+
+
+            data.push(row);
+
+        }
+    );
+
+
+    const ws =
+        XLSX.utils.aoa_to_sheet(
+            data
+        );
+
+
+    /*
+     * Merge title cells.
+     */
+
+    ws["!merges"] = [
+
+        {
+            s: {
+                r: 0,
+                c: 0
+            },
+            e: {
+                r: 0,
+                c: 33
+            }
+        },
+
+        {
+            s: {
+                r: 1,
+                c: 0
+            },
+            e: {
+                r: 1,
+                c: 33
+            }
+        },
+
+        {
+            s: {
+                r: 2,
+                c: 0
+            },
+            e: {
+                r: 2,
+                c: 33
+            }
+        },
+
+        {
+            s: {
+                r: 3,
+                c: 0
+            },
+            e: {
+                r: 3,
+                c: 33
+            }
+        },
+
+        {
+            s: {
+                r: 5,
+                c: 0
+            },
+            e: {
+                r: 5,
+                c: 33
+            }
+        }
+
+    ];
+
+
+    /*
+     * Column widths.
+     */
+
+    ws["!cols"] = [
+
+        {
+            wch: 30
+        },
+
+        {
+            wch: 13
+        },
+
+        {
+            wch: 12
+        }
+
+    ];
+
+
+    for (
+        let i = 0;
+        i < 31;
+        i++
+    ) {
+
+        ws["!cols"].push({
+
+            wch: 17
+
+        });
+
+    }
+
+
+    /*
+     * Row heights.
+     */
+
+    ws["!rows"] = [
+
+        {
+            hpt: 30
+        },
+
+        {
+            hpt: 25
+        },
+
+        {
+            hpt: 20
+        },
+
+        {
+            hpt: 20
+        },
+
+        {
+            hpt: 8
+        },
+
+        {
+            hpt: 24
+        },
+
+        {
+            hpt: 22
+        },
+
+        {
+            hpt: 22
+        },
+
+        {
+            hpt: 8
+        },
+
+        {
+            hpt: 34
+        }
+
+    ];
+
+
+    /*
+     * Title style.
+     */
+
+    ws["A1"].s = {
+
+        font: {
+
+            bold: true,
+
+            color:
+                COLORS.white,
+
+            sz: 18
+
+        },
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.navy
+            }
+
+        },
+
+        alignment: {
+
+            horizontal:
+                "center",
+
+            vertical:
+                "center"
+
+        }
+
+    };
+
+
+    ws["A2"].s = {
+
+        font: {
+
+            bold: true,
+
+            color:
+                COLORS.white,
+
+            sz: 13
+
+        },
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.blue
+            }
+
+        },
+
+        alignment: {
+
+            horizontal:
+                "center",
+
+            vertical:
+                "center"
+
+        }
+
+    };
+
+
+    ws["A3"].s = {
+
+        font: {
+
+            color:
+                COLORS.dark,
+
+            bold: true,
+
+            sz: 10
+
+        },
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.lightBlue
+            }
+
+        },
+
+        alignment: {
+
+            horizontal:
+                "center"
+
+        }
+
+    };
+
+
+    ws["A4"].s = {
+
+        font: {
+
+            color:
+                COLORS.greyText,
+
+            italic: true
+
+        },
+
+        alignment: {
+
+            horizontal:
+                "center"
+
+        }
+
+    };
+
+
+    /*
+     * Summary heading.
+     */
+
+    ws["A6"].s = {
+
+        font: {
+
+            bold: true,
+
+            color:
+                COLORS.white,
+
+            sz: 11
+
+        },
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.navy
+            }
+
+        },
+
+        alignment: {
+
+            horizontal:
+                "left"
+
+        }
+
+    };
+
+
+    /*
+     * Summary cells.
+     */
+
+    for (
+        let r = 6;
+        r <= 7;
+        r++
+    ) {
+
+        for (
+            let c = 0;
+            c < 6;
+            c++
+        ) {
+
+            const address =
+                XLSX.utils.encode_cell({
+
+                    r,
+                    c
+
+                });
+
+
+            if (
+                ws[address]
+            ) {
+
+                ws[address].s = {
+
+                    font: {
+
+                        bold:
+                            c % 2 === 0,
+
+                        color:
+                            COLORS.dark
+
+                    },
+
+                    fill: {
+
+                        fgColor: {
+
+                            rgb:
+                                c % 2 === 0
+                                    ? COLORS.sky
+                                    : COLORS.white
+
+                        }
+
+                    },
+
+                    alignment: {
+
+                        horizontal:
+                            c % 2 === 0
+                                ? "left"
+                                : "center",
+
+                        vertical:
+                            "center"
+
+                    },
+
+                    border:
+                        excelBorder()
+
+                };
+
+            }
+
+        }
+
+    }
+
+
+    /*
+     * Main header.
+     *
+     * Header is row 10 in zero-based index 9.
+     */
+
+    const headerRow = 9;
+
+
+    for (
+        let c = 0;
+        c <= 33;
+        c++
+    ) {
+
+        const address =
+            XLSX.utils.encode_cell({
+
+                r: headerRow,
+
+                c
+
+            });
+
+
+        if (
+            ws[address]
+        ) {
+
+            ws[address].s = {
+
+                font: {
+
+                    bold: true,
+
+                    color:
+                        COLORS.white,
+
+                    sz: 9
+
+                },
+
+                fill: {
+
+                    fgColor: {
+
+                        rgb:
+                            COLORS.navy
+
+                    }
+
+                },
+
+                alignment: {
+
+                    horizontal:
+                        "center",
+
+                    vertical:
+                        "center",
+
+                    wrapText:
+                        true
+
+                },
+
+                border:
+                    excelBorder()
+
+            };
+
+        }
+
+    }
+
+
+    /*
+     * Employee rows.
+     */
+
+    const firstEmployeeRow =
+        headerRow + 1;
+
+
+    for (
+        let r = firstEmployeeRow;
+        r <=
+            headerRow +
+            employees.length;
+        r++
+    ) {
+
+        const employeeIndex =
+            r -
+            firstEmployeeRow;
+
+
+        const employee =
+            employees[
+                employeeIndex
+            ];
+
+
+        for (
+            let c = 0;
+            c <= 33;
+            c++
+        ) {
+
+            const address =
+                XLSX.utils.encode_cell({
+
+                    r,
+                    c
+
+                });
+
+
+            const cell =
+                ws[address];
+
+
+            if (!cell) {
+                continue;
+            }
+
+
+            let fill =
+                employeeIndex % 2 === 0
+                    ? COLORS.white
+                    : COLORS.sky;
+
+
+            let fontColor =
+                COLORS.dark;
+
+
+            /*
+             * Day columns.
+             */
+
+            if (
+                c >= 3
+            ) {
+
+                const day =
+                    String(
+                        c - 2
+                    )
+                    .padStart(
+                        2,
+                        "0"
+                    );
+
+
+                const info =
+                    employee.days[
+                        day
+                    ];
+
+
+                if (
+                    info &&
+                    info.present
+                ) {
+
+                    if (
+                        info.late
+                    ) {
+
+                        fill =
+                            COLORS.yellow;
+
+                        fontColor =
+                            COLORS.yellowText;
+
+                    }
+
+                    else {
+
+                        fill =
+                            COLORS.green;
+
+                        fontColor =
+                            COLORS.greenText;
+
+                    }
+
+                }
+
+                else {
+
+                    fill =
+                        COLORS.grey;
+
+                    fontColor =
+                        COLORS.greyText;
+
+                }
+
+            }
+
+
+            /*
+             * Late count.
+             */
+
+            if (
+                c === 2 &&
+                employee.totalLate > 0
+            ) {
+
+                fill =
+                    COLORS.yellow;
+
+                fontColor =
+                    COLORS.yellowText;
+
+            }
+
+
+            cell.s = {
+
+                font: {
+
+                    color:
+                        fontColor,
+
+                    bold:
+                        c < 3
+
+                },
+
+                fill: {
+
+                    fgColor: {
+
+                        rgb:
+                            fill
+
+                    }
+
+                },
+
+                alignment: {
+
+                    horizontal:
+                        c === 0
+                            ? "left"
+                            : "center",
+
+                    vertical:
+                        "center",
+
+                    wrapText:
+                        true
+
+                },
+
+                border:
+                    excelBorder()
+
+            };
+
+        }
+
+        /*
+         * Taller attendance rows.
+         */
+
+        if (!ws["!rows"]) {
+            ws["!rows"] = [];
+        }
+
+
+        ws["!rows"][r] = {
+
+            hpt: 43
+
+        };
+
+    }
+
+
+    /*
+     * Freeze panes.
+     */
+
+    ws["!freeze"] = {
+
+        xSplit: 3,
+
+        ySplit: 10
+
+    };
+
+
+    /*
+     * Auto filter.
+     */
+
+    ws["!autofilter"] = {
+
+        ref:
+            "A10:AH" +
+            (
+                10 +
+                employees.length
+            )
+
+    };
+
+
+    /*
+     * Workbook.
+     */
+
+    const wb =
+        XLSX.utils.book_new();
+
+
+    XLSX.utils.book_append_sheet(
+
+        wb,
+
+        ws,
+
+        "Attendance Matrix"
+
+    );
+
+
+    /*
+     * Legend sheet.
+     */
+
+    const legendData = [
+
+        [
+            CONFIG.companyName
+        ],
+
+        [
+            "ATTENDANCE LEGEND"
+        ],
+
+        [
+            "GREEN",
+            "Present / On Time"
+        ],
+
+        [
+            "YELLOW",
+            "Late Arrival"
+        ],
+
+        [
+            "GREY",
+            "No Attendance / Blank / 0 / -"
+        ]
+
+    ];
+
+
+    const legendWs =
+        XLSX.utils.aoa_to_sheet(
+            legendData
+        );
+
+
+    legendWs["!cols"] = [
+
+        {
+            wch: 20
+        },
+
+        {
+            wch: 35
+        }
+
+    ];
+
+
+    legendWs["A1"].s = {
+
+        font: {
+
+            bold: true,
+
+            color:
+                COLORS.white,
+
+            sz: 16
+
+        },
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.navy
+            }
+
+        }
+
+    };
+
+
+    legendWs["A2"].s = {
+
+        font: {
+
+            bold: true,
+
+            color:
+                COLORS.white
+
+        },
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.blue
+            }
+
+        }
+
+    };
+
+
+    legendWs["A3"].s = {
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.green
+            }
+
+        },
+
+        font: {
+
+            bold: true,
+
+            color:
+                COLORS.greenText
+
+        }
+
+    };
+
+
+    legendWs["A4"].s = {
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.yellow
+            }
+
+        },
+
+        font: {
+
+            bold: true,
+
+            color:
+                COLORS.yellowText
+
+        }
+
+    };
+
+
+    legendWs["A5"].s = {
+
+        fill: {
+
+            fgColor: {
+                rgb: COLORS.grey
+            }
+
+        },
+
+        font: {
+
+            bold: true,
+
+            color:
+                COLORS.greyText
+
+        }
+
+    };
+
+
+    XLSX.utils.book_append_sheet(
+
+        wb,
+
+        legendWs,
+
+        "Legend"
+
+    );
+
+
+    XLSX.writeFile(
+
+        wb,
+
+        CONFIG.fileName +
+        ".xlsx"
+
+    );
+
+}
+
+
+/* ============================================================
+   PDF HELPERS
+============================================================ */
+
+function pdfColor(
+    doc,
+    type
+) {
+
+    const colors = {
+
+        navy:
+            [15, 23, 42],
+
+        blue:
+            [29, 78, 216],
+
+        green:
+            [22, 101, 52],
+
+        yellow:
+            [146, 64, 14],
+
+        grey:
+            [100, 116, 139],
+
+        lightGreen:
+            [220, 252, 231],
+
+        lightYellow:
+            [254, 243, 199],
+
+        lightGrey:
+            [241, 245, 249],
+
+        lightBlue:
+            [219, 234, 254],
+
+        white:
+            [255, 255, 255],
+
+        dark:
+            [51, 65, 85],
+
+        border:
+            [203, 213, 225]
+
+    };
+
+
+    return colors[type];
+
+}
+
+
+/* ============================================================
+   PDF HEADER
+============================================================ */
+
+function drawPdfHeader(
+    doc,
+    pageWidth
+) {
+
+    const navy =
+        pdfColor(
+            doc,
+            "navy"
+        );
+
+
+    const blue =
+        pdfColor(
+            doc,
+            "blue"
+        );
+
+
+    doc.setFillColor(
+        navy[0],
+        navy[1],
+        navy[2]
+    );
+
+
+    doc.rect(
+        0,
+        0,
+        pageWidth,
+        20,
+        "F"
+    );
+
+
+    doc.setFillColor(
+        blue[0],
+        blue[1],
+        blue[2]
+    );
+
+
+    doc.rect(
+        0,
+        20,
+        pageWidth,
+        3,
+        "F"
+    );
+
+
+    doc.setTextColor(
+        255,
+        255,
+        255
+    );
+
+
+    doc.setFont(
+        "helvetica",
+        "bold"
+    );
+
+
+    doc.setFontSize(
+        15
+    );
+
+
+    doc.text(
+        CONFIG.companyName,
+        10,
+        10
+    );
+
+
+    doc.setFontSize(
+        7
+    );
+
+
+    doc.setFont(
+        "helvetica",
+        "normal"
+    );
+
+
+    doc.text(
+        "BIOMETRIC ATTENDANCE MANAGEMENT",
+        10,
+        16
+    );
+
+
+    doc.text(
+        "Professional Attendance Report",
+        pageWidth - 10,
+        10,
+        {
+            align: "right"
+        }
+    );
+
+}
+
+
+/* ============================================================
+   PDF SUMMARY CARD
+============================================================ */
+
+function drawSummaryCard(
+    doc,
+    x,
+    y,
+    width,
+    label,
+    value,
+    color
+) {
+
+    const fill =
+        pdfColor(
+            doc,
+            "lightBlue"
+        );
+
+
+    doc.setFillColor(
+        fill[0],
+        fill[1],
+        fill[2]
+    );
+
+
+    doc.roundedRect(
+        x,
+        y,
+        width,
+        18,
+        2,
+        2,
+        "F"
+    );
+
+
+    doc.setTextColor(
+        71,
+        85,
+        105
+    );
+
+
+    doc.setFont(
+        "helvetica",
+        "bold"
+    );
+
+
+    doc.setFontSize(
+        6.5
+    );
+
+
+    doc.text(
+        label.toUpperCase(),
+        x + 4,
+        y + 6
+    );
+
+
+    doc.setTextColor(
+        color[0],
+        color[1],
+        color[2]
+    );
+
+
+    doc.setFontSize(
+        12
+    );
+
+
+    doc.text(
+        String(value),
+        x + 4,
+        y + 14
+    );
+
+}
+
+
+/* ============================================================
+   PDF REPORT
+============================================================ */
+
+function generatePDF(
+    employees
+) {
+
+    if (
+        typeof window.jspdf ===
+        "undefined" ||
+        !window.jspdf.jsPDF
+    ) {
+
+        throw new Error(
+            "PDF library failed to load."
+        );
+
+    }
+
+
+    const jsPDF =
+        window.jspdf.jsPDF;
+
+
+    const doc =
+        new jsPDF({
+
+            orientation:
+                "landscape",
+
+            unit:
+                "mm",
+
+            format:
+                "a4"
+
+        });
+
+
+    const pageWidth =
+        doc.internal.pageSize.getWidth();
+
+
+    const pageHeight =
+        doc.internal.pageSize.getHeight();
+
+
+    const stats =
+        getStatistics(
+            employees
+        );
+
+
+    /*
+     * ========================================================
+     * PAGE 1 — EXECUTIVE SUMMARY
+     * ========================================================
+     */
+
+    drawPdfHeader(
+        doc,
+        pageWidth
+    );
+
+
+    doc.setTextColor(
+        15,
+        23,
+        42
+    );
+
+
+    doc.setFont(
+        "helvetica",
+        "bold"
+    );
+
+
+    doc.setFontSize(
+        16
+    );
+
+
+    doc.text(
+        "Attendance Matrix Report",
+        10,
+        35
+    );
+
+
+    doc.setFont(
+        "helvetica",
+        "normal"
+    );
+
+
+    doc.setFontSize(
+        8
+    );
+
+
+    doc.setTextColor(
+        100,
+        116,
+        139
+    );
+
+
+    doc.text(
+        "Attendance Period: " +
+        getPeriodText(),
+        10,
+        41
+    );
+
+
+    doc.text(
+        "Generated: " +
+        new Date().toLocaleString(),
+        10,
+        46
+    );
+
+
+    /*
+     * Summary cards.
+     */
+
+    const cardY =
+        53;
+
+
+    const cardGap =
+        5;
+
+
+    const cardWidth =
+        (
+            pageWidth -
+            20 -
+            cardGap * 3
+        ) / 4;
+
+
+    drawSummaryCard(
+
+        doc,
+
+        10,
+
+        cardY,
+
+        cardWidth,
+
+        "Total Employees",
+
+        stats.totalEmployees,
+
+        [29, 78, 216]
+
+    );
+
+
+    drawSummaryCard(
+
+        doc,
+
+        10 +
+        cardWidth +
+        cardGap,
+
+        cardY,
+
+        cardWidth,
+
+        "With Attendance",
+
+        stats.employeesWithAttendance,
+
+        [22, 101, 52]
+
+    );
+
+
+    drawSummaryCard(
+
+        doc,
+
+        10 +
+        (cardWidth + cardGap) * 2,
+
+        cardY,
+
+        cardWidth,
+
+        "Total Late",
+
+        stats.totalLate,
+
+        [146, 64, 14]
+
+    );
+
+
+    drawSummaryCard(
+
+        doc,
+
+        10 +
+        (cardWidth + cardGap) * 3,
+
+        cardY,
+
+        cardWidth,
+
+        "Attendance Rate",
+
+        stats.attendanceRate.toFixed(1) + "%",
+
+        [29, 78, 216]
+
+    );
+
+
+    /*
+     * Employee summary table.
+     */
+
+    const employeeSummary =
+        employees.map(
+            emp => [
+
+                emp.name,
+
+                emp.id,
+
+                String(
+                    emp.presentDays
+                ),
+
+                String(
+                    31 -
+                    emp.presentDays
+                ),
+
+                String(
+                    emp.totalLate
+                ),
+
+                (
+                    (
+                        emp.presentDays /
+                        31
+                    ) *
+                    100
+                ).toFixed(1) +
+                "%"
+
+            ]
+        );
+
+
+    doc.autoTable({
+
+        startY:
+            79,
+
+        margin: {
+            left: 10,
+            right: 10
+        },
+
+        head: [[
+
+            "EMPLOYEE",
+
+            "EMP ID",
+
+            "PRESENT",
+
+            "ABSENT / NO DATA",
+
+            "LATE",
+
+            "ATTENDANCE"
+
+        ]],
+
+        body:
+            employeeSummary,
+
+        theme:
+            "grid",
+
+        styles: {
+
+            font:
+                "helvetica",
+
+            fontSize:
+                7,
+
+            cellPadding:
+                2.5,
+
+            valign:
+                "middle",
+
+            textColor:
+                [51, 65, 85],
+
+            lineColor:
+                [203, 213, 225],
+
+            lineWidth:
+                0.1
+
+        },
+
+        headStyles: {
+
+            fillColor:
+                [15, 23, 42],
+
+            textColor:
+                [255, 255, 255],
+
+            fontStyle:
+                "bold",
+
+            halign:
+                "center"
+
+        },
+
+        alternateRowStyles: {
+
+            fillColor:
+                [248, 250, 252]
+
+        },
+
+        columnStyles: {
+
+            0: {
+                cellWidth: 70
+            },
+
+            1: {
+                cellWidth: 25,
+                halign: "center"
+            },
+
+            2: {
+                cellWidth: 25,
+                halign: "center"
+            },
+
+            3: {
+                cellWidth: 35,
+                halign: "center"
+            },
+
+            4: {
+                cellWidth: 20,
+                halign: "center"
+            },
+
+            5: {
+                cellWidth: 28,
+                halign: "center"
+            }
+
+        }
+
+    });
+
+
+    /*
+     * ========================================================
+     * ATTENDANCE MATRIX PAGES
+     * One employee per page for maximum readability.
+     * ========================================================
+     */
+
+    employees.forEach(
+        (emp, index) => {
+
+            doc.addPage();
+
+
+            drawPdfHeader(
+                doc,
+                pageWidth
+            );
+
+
+            /*
+             * Employee heading.
+             */
+
+            doc.setTextColor(
+                15,
+                23,
+                42
+            );
+
+
+            doc.setFont(
+                "helvetica",
+                "bold"
+            );
+
+
+            doc.setFontSize(
+                13
+            );
+
+
+            doc.text(
+                emp.name,
+                10,
+                34
+            );
+
+
+            doc.setFont(
+                "helvetica",
+                "normal"
+            );
+
+
+            doc.setFontSize(
+                7
+            );
+
+
+            doc.setTextColor(
+                100,
+                116,
+                139
+            );
+
+
+            doc.text(
+                "Employee ID: " +
+                emp.id,
+                10,
+                40
+            );
+
+
+            doc.text(
+                "Attendance Period: " +
+                getPeriodText(),
+                10,
+                45
+            );
+
+
+            /*
+             * Small employee stats.
+             */
+
+            const present =
+                emp.presentDays;
+
+
+            const absent =
+                31 -
+                present;
+
+
+            const attendance =
+                (
+                    present /
+                    31
+                ) *
+                100;
+
+
+            doc.setTextColor(
+                51,
+                65,
+                85
+            );
+
+
+            doc.setFont(
+                "helvetica",
+                "bold"
+            );
+
+
+            doc.text(
+                "Present: " +
+                present +
+                "    " +
+                "No Attendance: " +
+                absent +
+                "    " +
+                "Late: " +
+                emp.totalLate +
+                "    " +
+                "Attendance: " +
+                attendance.toFixed(1) +
+                "%",
+                10,
+                51
+            );
+
+
+            /*
+             * Main daily matrix.
+             *
+             * 31 days are split into a compact table.
+             */
+
+            const matrixHead = [];
+
+
+            for (
+                let d = 1;
+                d <= 31;
+                d++
+            ) {
+
+                matrixHead.push(
+                    "DAY " + d
+                );
+
+            }
+
+
+            const matrixBody = [[]];
+
+
+            for (
+                let d = 1;
+                d <= 31;
+                d++
+            ) {
+
+                const day =
+                    String(d)
+                        .padStart(
+                            2,
+                            "0"
+                        );
+
+
+                const info =
+                    emp.days[
+                        day
+                    ];
+
+
+                if (
+                    info &&
+                    info.present
+                ) {
+
+                    matrixBody[0].push(
+
+                        info.in +
+                        "\n" +
+                        info.out +
+                        "\n" +
+                        info.hrs
+
+                    );
+
+                }
+
+                else {
+
+                    matrixBody[0].push(
+                        "NO DATA"
+                    );
+
+                }
+
+            }
+
+
+            doc.autoTable({
+
+                startY:
+                    56,
+
+                margin: {
+
+                    left:
+                        7,
+
+                    right:
+                        7
+
+                },
+
+                head: [
+                    matrixHead
+                ],
+
+                body:
+                    matrixBody,
+
+                theme:
+                    "grid",
+
+                styles: {
+
+                    font:
+                        "helvetica",
+
+                    fontSize:
+                        5,
+
+                    cellPadding:
+                        1.5,
+
+                    halign:
+                        "center",
+
+                    valign:
+                        "middle",
+
+                    lineColor:
+                        [203, 213, 225],
+
+                    lineWidth:
+                        0.1,
+
+                    minCellHeight:
+                        18
+
+                },
+
+                headStyles: {
+
+                    fillColor:
+                        [15, 23, 42],
+
+                    textColor:
+                        [255, 255, 255],
+
+                    fontStyle:
+                        "bold",
+
+                    fontSize:
+                        5
+
+                },
+
+                didParseCell:
+                    function (
+                        data
+                    ) {
+
+                        if (
+                            data.section !==
+                            "body"
+                        ) {
+                            return;
+                        }
+
+
+                        const day =
+                            data.column.index +
+                            1;
+
+
+                        const key =
+                            String(day)
+                                .padStart(
+                                    2,
+                                    "0"
+                                );
+
+
+                        const info =
+                            emp.days[
+                                key
+                            ];
+
+
+                        if (
+                            info &&
+                            info.present
+                        ) {
+
+                            if (
+                                info.late
+                            ) {
+
+                                data.cell.styles
+                                    .fillColor =
+                                    [254, 243, 199];
+
+                                data.cell.styles
+                                    .textColor =
+                                    [146, 64, 14];
+
+                            }
+
+                            else {
+
+                                data.cell.styles
+                                    .fillColor =
+                                    [220, 252, 231];
+
+                                data.cell.styles
+                                    .textColor =
+                                    [22, 101, 52];
+
+                            }
+
+                        }
+
+                        else {
+
+                            data.cell.styles
+                                .fillColor =
+                                [241, 245, 249];
+
+                            data.cell.styles
+                                .textColor =
+                                [100, 116, 139];
+
+                        }
+
+                    }
+
+            });
+
+
+            /*
+             * Legend.
+             */
+
+            const legendY =
+                78;
+
+
+            doc.setFont(
+                "helvetica",
+                "bold"
+            );
+
+
+            doc.setFontSize(
+                7
+            );
+
+
+            doc.setTextColor(
+                51,
+                65,
+                85
+            );
+
+
+            doc.text(
+                "LEGEND",
+                10,
+                legendY
+            );
+
+
+            /*
+             * Green.
+             */
+
+            doc.setFillColor(
+                220,
+                252,
+                231
+            );
+
+
+            doc.roundedRect(
+                32,
+                legendY - 4,
+                8,
+                5,
+                1,
+                1,
+                "F"
+            );
+
+
+            doc.setFont(
+                "helvetica",
+                "normal"
+            );
+
+
+            doc.text(
+                "Present / On Time",
+                43,
+                legendY
+            );
+
+
+            /*
+             * Yellow.
+             */
+
+            doc.setFillColor(
+                254,
+                243,
+                199
+            );
+
+
+            doc.roundedRect(
+                80,
+                legendY - 4,
+                8,
+                5,
+                1,
+                1,
+                "F"
+            );
+
+
+            doc.text(
+                "Late Arrival",
+                91,
+                legendY
+            );
+
+
+            /*
+             * Grey.
+             */
+
+            doc.setFillColor(
+                241,
+                245,
+                249
+            );
+
+
+            doc.roundedRect(
+                125,
+                legendY - 4,
+                8,
+                5,
+                1,
+                1,
+                "F"
+            );
+
+
+            doc.text(
+                "No Attendance",
+                136,
+                legendY
+            );
+
+
+            /*
+             * Footer.
+             */
+
+            doc.setDrawColor(
+                203,
+                213,
+                225
+            );
+
+
+            doc.line(
+                10,
+                pageHeight - 13,
+                pageWidth - 10,
+                pageHeight - 13
+            );
+
+
+            doc.setFont(
+                "helvetica",
+                "normal"
+            );
+
+
+            doc.setFontSize(
+                6
+            );
+
+
+            doc.setTextColor(
+                100,
+                116,
+                139
+            );
+
+
+            doc.text(
+                CONFIG.companyName +
+                " • Biometric Attendance Report",
+                10,
+                pageHeight - 7
+            );
+
+
+            doc.text(
+                "Page " +
+                (index + 2),
+                pageWidth - 10,
+                pageHeight - 7,
+                {
+                    align:
+                        "right"
+                }
+            );
+
+        }
+    );
+
+
+    /*
+     * Add footer to summary page.
+     */
+
+    doc.setDrawColor(
+        203,
+        213,
+        225
+    );
+
+
+    doc.line(
+        10,
+        pageHeight - 13,
+        pageWidth - 10,
+        pageHeight - 13
+    );
+
+
+    doc.setFont(
+        "helvetica",
+        "normal"
+    );
+
+
+    doc.setFontSize(
+        6
+    );
+
+
+    doc.setTextColor(
+        100,
+        116,
+        139
+    );
+
+
+    doc.text(
+        CONFIG.companyName +
+        " • Biometric Attendance Report",
+        10,
+        pageHeight - 7
+    );
+
+
+    doc.text(
+        "Page 1",
+        pageWidth - 10,
+        pageHeight - 7,
+        {
+            align:
+                "right"
+        }
+    );
+
+
+    /*
+     * Save.
+     */
+
+    doc.save(
+
+        CONFIG.fileName +
+        ".pdf"
+
+    );
+
+}
+
+
+/* ============================================================
+   MAIN PROCESS
+============================================================ */
+
+window.processAndDownload =
+    async function (
+        outputFormat
+    ) {
+
+        try {
+
+            if (
+                !fileInput.files ||
+                !fileInput.files.length
+            ) {
+
+                alert(
+                    "Please select an attendance Excel file first."
+                );
+
+                return;
+
+            }
+
+
+            const file =
+                fileInput.files[0];
+
+
+            showStatus(
+
+                "Reading workbook, scanning all worksheets and preparing the professional report...",
+
+                "info"
+
+            );
+
+
+            const result =
+                await readExcelFile(
+                    file
+                );
+
+
+            if (
+                !result.employees.length
+            ) {
+
+                showStatus(
+
+                    "No employee names were found. Please verify that your Excel file contains a Name header followed by employee names.",
+
+                    "error"
+
+                );
+
+                return;
+
+            }
+
+
+            const stats =
+                getStatistics(
+                    result.employees
+                );
+
+
+            showStatus(
+
+                "✓ " +
+                stats.totalEmployees +
+                " employees found • " +
+                stats.employeesWithAttendance +
+                " with attendance • " +
+                stats.totalLate +
+                " late entries • " +
+                result.usedSheets.length +
+                " worksheet(s) processed.",
+
+                "success"
+
+            );
+
+
+            if (
+                outputFormat ===
+                "excel"
+            ) {
+
+                generateExcel(
+                    result.employees
+                );
+
+            }
+
+            else if (
+                outputFormat ===
+                "pdf"
+            ) {
+
+                generatePDF(
+                    result.employees
+                );
+
+            }
+
+            else {
+
+                throw new Error(
+                    "Unknown output format."
+                );
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.error(
+                error
+            );
+
+
+            showStatus(
+
+                "Error: " +
+                (
+                    error.message ||
+                    String(error)
+                ),
+
+                "error"
+
+            );
+
+
+            alert(
+
+                "Unable to generate the report.\n\n" +
+                (
+                    error.message ||
+                    String(error)
+                )
+
+            );
+
+        }
+
+    };
+
+
+/* ============================================================
+   PUBLIC ALIASES
+============================================================ */
+
+window.generateAttendanceExcel =
+    function () {
+
+        return window.processAndDownload(
+            "excel"
+        );
+
+    };
+
+
+window.generateAttendancePDF =
+    function () {
+
+        return window.processAndDownload(
+            "pdf"
+        );
+
+    };
+
+
+/* ============================================================
+   BUTTON EVENTS
+============================================================ */
+
+document
+    .getElementById("excelBtn")
+    .addEventListener(
+        "click",
+        function () {
+
+            window.processAndDownload(
+                "excel"
+            );
+
+        }
+    );
+
+
+document
+    .getElementById("pdfBtn")
+    .addEventListener(
+        "click",
+        function () {
+
+            window.processAndDownload(
+                "pdf"
+            );
+
+        }
+    );
+
+
+})();
+
+</script>
+
 </body>
 </html>
