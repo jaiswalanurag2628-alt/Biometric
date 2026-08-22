@@ -26,7 +26,7 @@
                 Biometric Attendance Matrix Generator
             </h1>
             <p class="text-sm text-slate-500">
-                Supports standard matrix formats and multi-row employee log formats across all sheets.
+                Reads employee attendance from all Excel sheets and logs the Sheet Name in Column 2.
             </p>
         </div>
     </div>
@@ -182,7 +182,7 @@
             "name", "aug", "sep", "oct", "nov", "dec", "jan", "feb", "mar",
             "apr", "may", "jun", "jul", "present/absent", "present absent",
             "enter-exit", "enter exit", "employee", "employee name",
-            "emp name", "date", "day"
+            "emp name", "date", "day", "sheet", "sheet name"
         ];
         return blocked.includes(v);
     }
@@ -194,13 +194,12 @@
      */
     function parseFormat1Worksheet(rows, sheetName, employeeCounter) {
         const employees = [];
-        let currentDayCols = {}; // colIdx -> "01", "02", ...
+        let currentDayCols = {};
 
         for (let r = 0; r < rows.length; r++) {
             const row = rows[r] || [];
             if (!row.length) continue;
 
-            // Detect day header rows e.g. ["1 Aug", "2 Aug", ...] or [1, 2, 3, ...]
             const tempDayCols = {};
             for (let c = 1; c < row.length; c++) {
                 const cellVal = clean(row[c]);
@@ -218,7 +217,6 @@
                 continue;
             }
 
-            // Detect employee card row
             const firstCell = clean(row[0]);
             if (/emp\s*code\s*:/i.test(firstCell) || /emp\s*name\s*:/i.test(firstCell)) {
                 const codeMatch = firstCell.match(/emp\s*code\s*:\s*([^,\n\r]*)/i);
@@ -274,6 +272,7 @@
                 });
 
                 employees.push({
+                    sheetName: sheetName,
                     id: empCode || "EMP-" + String(employeeCounter + employees.length + 1).padStart(3, "0"),
                     name: empName,
                     totalLate: totalLate,
@@ -312,7 +311,7 @@
         return -1;
     }
 
-    function detectEmployeesFormat2(rows, nameRow, firstDayRow, employeeCounter) {
+    function detectEmployeesFormat2(rows, nameRow, firstDayRow, employeeCounter, sheetName) {
         const header = rows[nameRow] || [];
         const result = [];
         const nameIndex = header.findIndex(v => clean(v).toLowerCase() === "name");
@@ -336,6 +335,7 @@
             if (hasData) {
                 result.push({
                     colIdx: c,
+                    sheetName: sheetName,
                     name: employeeName,
                     id: "EMP-" + String(employeeCounter + result.length + 1).padStart(3, "0"),
                     totalLate: 0,
@@ -353,7 +353,7 @@
         const firstDayRow = findFirstDayRow(rows, nameRow);
         if (firstDayRow < 0) return [];
 
-        const employees = detectEmployeesFormat2(rows, nameRow, firstDayRow, employeeCounter);
+        const employees = detectEmployeesFormat2(rows, nameRow, firstDayRow, employeeCounter, sheetName);
         if (!employees.length) return [];
 
         for (let r = firstDayRow; r < rows.length; r++) {
@@ -390,10 +390,8 @@
             return { employees: [], sheetName: sheetName };
         }
 
-        // Try Format 1 first
         let emps = parseFormat1Worksheet(rows, sheetName, employeeCounter);
 
-        // If Format 1 not found, try Format 2
         if (!emps || emps.length === 0) {
             emps = parseFormat2Worksheet(rows, sheetName, employeeCounter);
         }
@@ -439,7 +437,7 @@
         const seen = new Set();
 
         employees.forEach(emp => {
-            const key = emp.name.toLowerCase().replace(/\s+/g, " ").trim();
+            const key = (emp.sheetName + "_" + emp.name).toLowerCase().replace(/\s+/g, " ").trim();
             if (!seen.has(key)) {
                 seen.add(key);
                 unique.push(emp);
@@ -476,14 +474,21 @@
             [""]
         ];
 
-        const header = ["Emp Name", "Emp ID", "Total Late"];
+        // Column 1: Emp Name, Column 2: Shift Name, Column 3: Emp ID, Column 4: Total Late
+        const header = ["Emp Name", "Shift Name", "Emp ID", "Total Late"];
         for (let d = 1; d <= 31; d++) {
             header.push("Day " + d);
         }
         data.push(header);
 
         employees.forEach(emp => {
-            const row = [emp.name, emp.id, emp.totalLate];
+            const row = [
+                emp.name,
+                emp.sheetName || "",
+                emp.id,
+                emp.totalLate
+            ];
+
             for (let d = 1; d <= 31; d++) {
                 const day = String(d).padStart(2, "0");
                 const info = emp.days[day];
@@ -502,7 +507,12 @@
         });
 
         const ws = XLSX.utils.aoa_to_sheet(data);
-        ws["!cols"] = [{ wch: 28 }, { wch: 12 }, { wch: 12 }];
+        ws["!cols"] = [
+            { wch: 28 }, // Emp Name
+            { wch: 22 }, // Sheet Name
+            { wch: 12 }, // Emp ID
+            { wch: 12 }  // Total Late
+        ];
         for (let i = 0; i < 31; i++) {
             ws["!cols"].push({ wch: 18 });
         }
@@ -531,7 +541,7 @@
                 if (!ws[addr]) continue;
                 ws[addr].s = {
                     alignment: {
-                        horizontal: c === 0 ? "left" : "center",
+                        horizontal: (c === 0 || c === 1) ? "left" : "center",
                         vertical: "center",
                         wrapText: true
                     },
@@ -545,7 +555,8 @@
             }
         }
 
-        ws["!freeze"] = { xSplit: 3, ySplit: 5 };
+        // Freeze columns up to Column D (first 4 columns) and top header rows
+        ws["!freeze"] = { xSplit: 4, ySplit: 5 };
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Custom Matrix");
         XLSX.writeFile(wb, "Custom_Matrix_Attendance.xlsx");
@@ -577,19 +588,21 @@
             doc.setFont("helvetica", "bold");
             doc.text(
                 "Emp Name: " + emp.name +
+                " | Sheet: " + (emp.sheetName || "N/A") +
                 " | Emp ID: " + emp.id +
                 " | Total Late: " + emp.totalLate,
                 10,
                 21
             );
 
-            const headers = ["Emp Name", "Emp ID", "Total Late"];
+            const headers = ["Emp Name", "Sheet Name", "Emp ID", "Total Late"];
             for (let d = 1; d <= 31; d++) {
                 headers.push("Day " + d);
             }
 
             const body = [[
                 emp.name,
+                emp.sheetName || "",
                 emp.id,
                 String(emp.totalLate)
             ]];
@@ -628,9 +641,10 @@
                     halign: "center"
                 },
                 columnStyles: {
-                    0: { cellWidth: 25, halign: "left" },
-                    1: { cellWidth: 14 },
-                    2: { cellWidth: 13 }
+                    0: { cellWidth: 22, halign: "left" },
+                    1: { cellWidth: 18, halign: "left" },
+                    2: { cellWidth: 12 },
+                    3: { cellWidth: 10 }
                 }
             });
         });
