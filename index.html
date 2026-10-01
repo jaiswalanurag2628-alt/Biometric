@@ -26,7 +26,7 @@
                 Biometric Attendance Matrix Generator
             </h1>
             <p class="text-sm text-slate-500">
-                Reads employee attendance from all Excel sheets and logs the Sheet Name in Column 2.
+                Reads employee attendance across formats (blocks, vertical days, or horizontal matrix columns).
             </p>
         </div>
     </div>
@@ -159,6 +159,22 @@
             return { in: "--", out: "--", hrs: "00:00" };
         }
 
+        // Handles multiline: "In: 07:34\nOut: 15:00\nHrs: 7:26"
+        if (/In\s*:/i.test(raw)) {
+            const inMatch = raw.match(/In\s*:\s*([0-9]{1,2}:[0-9]{2}(?:\s*[AaPp][Mm])?)/i);
+            const outMatch = raw.match(/Out\s*:\s*([0-9]{1,2}:[0-9]{2}(?:\s*[AaPp][Mm])?)/i);
+            const hrsMatch = raw.match(/Hrs\s*:\s*([0-9]{1,2}:[0-9]{2})/i);
+
+            const inTime = inMatch ? clean(inMatch[1]) : "--";
+            const outTime = outMatch ? clean(outMatch[1]) : "--";
+            const hrs = hrsMatch 
+                ? clean(hrsMatch[1]) 
+                : (inTime !== "--" && outTime !== "--" ? calculateWorkingHours(inTime, outTime) : "00:00");
+
+            return { in: inTime, out: outTime, hrs: hrs };
+        }
+
+        // Handles hyphenated formats: "07:34 - 15:00"
         let parts = raw.split(/\s*[-–—]\s*/);
         if (parts.length < 2) {
             return { in: raw, out: "--", hrs: "00:00" };
@@ -182,7 +198,7 @@
             "name", "aug", "sep", "oct", "nov", "dec", "jan", "feb", "mar",
             "apr", "may", "jun", "jul", "present/absent", "present absent",
             "enter-exit", "enter exit", "employee", "employee name",
-            "emp name", "date", "day", "sheet", "sheet name"
+            "emp name", "date", "day", "sheet", "sheet name", "total absent", "total present"
         ];
         return blocked.includes(v);
     }
@@ -379,6 +395,106 @@
         return employees;
     }
 
+    /* 
+     * ========================================================
+     * FORMAT 3 PARSER: (Horizontal Days as Columns: "01 Sep", "02 Sep"...)
+     * ========================================================
+     */
+    function parseFormat3Worksheet(rows, sheetName, employeeCounter) {
+        if (!rows || rows.length < 2) return [];
+
+        let headerRowIdx = -1;
+        let colNameIdx = -1;
+        let colIdIdx = -1;
+        let colShiftIdx = -1;
+        let colLateIdx = -1;
+        let dayCols = {};
+
+        // Find the header row containing employee info & day columns
+        for (let r = 0; r < Math.min(rows.length, 10); r++) {
+            const row = rows[r] || [];
+            const tempDayCols = {};
+            let foundName = false;
+
+            for (let c = 0; c < row.length; c++) {
+                const val = clean(row[c]);
+                const lower = val.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+                if (/^(empname|name|employeename)$/.test(lower)) {
+                    colNameIdx = c;
+                    foundName = true;
+                } else if (/^(empid|empcode|id|code)$/.test(lower)) {
+                    colIdIdx = c;
+                } else if (/^(shift|shiftname|department)$/.test(lower)) {
+                    colShiftIdx = c;
+                } else if (/^(totallate|late)$/.test(lower)) {
+                    colLateIdx = c;
+                }
+
+                // Check for day patterns like "01 Sep", "1 Sep", "Day 1", "01"
+                const dayMatch = val.match(/^(\d{1,2})(?:\s+[A-Za-z]+|[/-][A-Za-z0-9]+)?$/);
+                if (dayMatch) {
+                    const d = parseInt(dayMatch[1], 10);
+                    if (d >= 1 && d <= 31) {
+                        tempDayCols[c] = String(d).padStart(2, "0");
+                    }
+                }
+            }
+
+            if (foundName && Object.keys(tempDayCols).length >= 1) {
+                headerRowIdx = r;
+                dayCols = tempDayCols;
+                break;
+            }
+        }
+
+        if (headerRowIdx === -1) return [];
+
+        const employees = [];
+
+        for (let r = headerRowIdx + 1; r < rows.length; r++) {
+            const row = rows[r] || [];
+            const rawName = colNameIdx !== -1 ? row[colNameIdx] : "";
+            const empName = normalizeName(rawName);
+
+            if (!empName || isBlockedHeader(empName)) continue;
+
+            const empCode = colIdIdx !== -1 && row[colIdIdx] ? clean(row[colIdIdx]) : "";
+            const shiftName = colShiftIdx !== -1 && row[colShiftIdx] ? clean(row[colShiftIdx]) : sheetName;
+
+            let fileLate = 0;
+            if (colLateIdx !== -1 && row[colLateIdx] !== undefined && row[colLateIdx] !== "") {
+                const parsed = parseInt(clean(row[colLateIdx]), 10);
+                if (!Number.isNaN(parsed)) fileLate = parsed;
+            }
+
+            const days = {};
+            let calculatedLate = 0;
+
+            Object.keys(dayCols).forEach(colIdx => {
+                const dayStr = dayCols[colIdx];
+                const rawCell = colIdx < row.length ? row[colIdx] : "";
+                const punch = parsePunch(rawCell);
+                days[dayStr] = punch;
+
+                const inMin = timeToMinutes(punch.in);
+                if (inMin !== null && inMin > 9 * 60) {
+                    calculatedLate++;
+                }
+            });
+
+            employees.push({
+                sheetName: shiftName || sheetName,
+                id: empCode || "EMP-" + String(employeeCounter + employees.length + 1).padStart(3, "0"),
+                name: empName,
+                totalLate: colLateIdx !== -1 ? fileLate : calculatedLate,
+                days: days
+            });
+        }
+
+        return employees;
+    }
+
     function parseWorksheet(sheet, sheetName, employeeCounter) {
         const rows = XLSX.utils.sheet_to_json(sheet, {
             header: 1,
@@ -394,6 +510,10 @@
 
         if (!emps || emps.length === 0) {
             emps = parseFormat2Worksheet(rows, sheetName, employeeCounter);
+        }
+
+        if (!emps || emps.length === 0) {
+            emps = parseFormat3Worksheet(rows, sheetName, employeeCounter);
         }
 
         return {
@@ -474,7 +594,6 @@
             [""]
         ];
 
-        // Column 1: Emp Name, Column 2: Shift Name, Column 3: Emp ID, Column 4: Total Late
         const header = ["Emp Name", "Shift Name", "Emp ID", "Total Late"];
         for (let d = 1; d <= 31; d++) {
             header.push("Day " + d);
@@ -508,10 +627,10 @@
 
         const ws = XLSX.utils.aoa_to_sheet(data);
         ws["!cols"] = [
-            { wch: 28 }, // Emp Name
-            { wch: 22 }, // Sheet Name
-            { wch: 12 }, // Emp ID
-            { wch: 12 }  // Total Late
+            { wch: 28 },
+            { wch: 22 },
+            { wch: 12 },
+            { wch: 12 }
         ];
         for (let i = 0; i < 31; i++) {
             ws["!cols"].push({ wch: 18 });
@@ -555,7 +674,6 @@
             }
         }
 
-        // Freeze columns up to Column D (first 4 columns) and top header rows
         ws["!freeze"] = { xSplit: 4, ySplit: 5 };
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Custom Matrix");
